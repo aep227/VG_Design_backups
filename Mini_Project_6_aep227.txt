@@ -1,0 +1,502 @@
+/*
+    Author: Addison Powell
+    Date: October 22, 2019
+    Comments: A simple little "zoo" animation. The two creatures I
+    originally was going to emulate were an otter and a penquin (with a
+    long tail, due to the design requirements). The end result looks
+    absolutely nothing like an otter or a penguin.
+    The two creatures were created with subdivision. The initial points are
+    put into an array, and then several iterations of subdivision smooth       out the shape of the animal. For the tails, a bezier curve is used with
+    moving points along the tail to simulate the movement.
+    Given the cold weather theme of the 2 animals, I attempted to have an
+    "icy" theme to the zoo with the icy blocks for walls. In the center is
+    a dirt path that people walk along to look at these creatures.
+    
+    I tried to make the animals move up and down, but the subdivision
+    process threw a fit and wouldn't work correctly after updating all the
+    points in the array.
+    I made this over the course of about 2-3 hours, so the polish on this
+    is nonexistant. I've got 3 other projects to finish by the end of the
+    week so this is the best I can do given how little time I have to work
+    on it.
+*/
+
+var monteCarlo = function()
+{
+    var v1 = random(220, 255);
+    var v2 = random(220, 255);
+    while (v2 > v1) {
+        v1 = random(220, 255);
+        v2 = random(220, 255);
+    }
+    return(v1);
+};
+
+var particleObj = function(x, y)
+{
+    this.position = new PVector(x, y);
+    this.velocity = new PVector(random(-0.3, 0.3), random(-1.3, -1.5));
+    this.size = random(2, 4);
+    this.position.y -= (18 - this.size);
+    this.c1 = monteCarlo();
+    this.timeLeft = 255;
+};
+
+var fountainObj = function(x, y)
+{
+    this.x = x;
+    this.y = y;
+    this.particles = [];
+};
+
+var gravity = new PVector(0, 0.02);
+var fountains = [];
+fountains.push(new fountainObj(110, 360));
+fountains.push(new fountainObj(290, 360));
+fountains.push(new fountainObj(200, 120));
+
+
+var walls = [];
+var paths = [];
+var water = [];
+var custom_images = [];
+
+particleObj.prototype.move = function() {
+    this.velocity.add(gravity);
+    this.position.add(this.velocity);
+    this.timeLeft--;
+};
+
+particleObj.prototype.draw = function() {
+    noStroke();
+    fill(this.c1, 50, 0, this.timeLeft);
+    ellipse(this.position.x, this.position.y, this.size, this.size*2);
+};
+
+fountainObj.prototype.execute = function() {
+    if (this.particles.length < 300) {
+        this.particles.push(new particleObj(this.x, this.y));
+        this.particles.push(new particleObj(this.x, this.y));
+        this.particles.push(new particleObj(this.x, this.y));
+    }
+    for (var i=0; i<this.particles.length; i++) {
+        if ((this.particles[i].timeLeft > 0) && 
+            (this.particles[i].position.y < this.y)) {
+            this.particles[i].draw();
+            this.particles[i].move();
+        }
+        else {
+            this.particles.splice(i, 1);
+        }
+    } 
+    fill(0, 0, 255);
+    ellipse(this.x, this.y-9, 20, 10);
+};
+
+var tilemap = [
+        "wwwwwwwwwwwwwwwwwwww",
+        "w                  w",
+        "w                  w",
+        "w                  w",
+        "w                  w",
+        "w    wwwwwwwwww    w",
+        "w    w        w    w",
+        "w    w        w    w",
+        "w    w   pp   w    w",
+        "w    w   pp   w    w",
+        "w    w   pp   w    w",
+        "w    w   pp   w    w",
+        "wrrrrw   pp   wrrrrw",
+        "wrrrrw   pp   wrrrrw",
+        "wrrrrw   pp   wrrrrw",
+        "wrrrrw   pp   wrrrrw",
+        "wrrrrw   pp   wrrrrw",
+        "wrrrrw   pp   wrrrrw",
+        "wrrrrw   pp   wrrrrw",
+        "wwwwww   pp   wwwwww",
+        ];
+        
+var WallObj = function(x, y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+var PathObj = function(x, y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+var WaterObj = function(x, y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+var AnimalObj = function(x, y)
+{
+    this.x = x;
+    this.y = y;
+    this.direction = "Down";
+};
+
+var initTilemap = function()
+{
+    for (var i = 0; i< tilemap.length; i++)
+    {
+        for (var j = 0; j < tilemap[i].length; j++)
+        {
+            switch (tilemap[i][j])
+            {
+                case 'w': walls.push(new WallObj(j*20, i*20));
+                    break;
+                case 'p': paths.push(new PathObj(j*20, i*20));
+                    break;
+                case 'r': water.push(new WaterObj(j*20, i*20));
+                    break;
+                    
+            }
+        }
+    }
+};
+
+var init_custom_graphics = function()
+{
+    noStroke();
+    background(180, 230, 255);
+    fill(40, 40, 160);//Dark blue
+    rect(0, 0, 75, 25);
+    rect(325, 0, 75, 25);
+    rect(75, 25, 50, 25);
+    rect(275, 25, 50, 25);
+    rect(125, 50, 150, 25);
+    rect(0, 100, 75, 25);
+    rect(325, 100, 75, 25);
+    rect(75, 125, 50, 25);
+    rect(275, 125, 50, 25);
+    rect(125, 150, 150, 25);
+    rect(0, 200, 75, 25);
+    rect(325, 200, 75, 25);
+    rect(75, 225, 50, 25);
+    rect(275, 225, 50, 25);
+    rect(125, 250, 150, 25);
+    rect(0, 300, 75, 25);
+    rect(325, 300, 75, 25);
+    rect(75, 325, 50, 25);
+    rect(275, 325, 50, 25);
+    rect(125, 350, 150, 25);
+    
+    fill(30, 160, 255);//Medium blue
+    rect(0, 25, 75, 25);
+    rect(325, 25, 75, 25);
+    rect(75, 50, 50, 25);
+    rect(275, 50, 50, 25);
+    rect(125, 75, 150, 25);
+    rect(0, 125, 75, 25);
+    rect(325, 125, 75, 25);
+    rect(75, 150, 50, 25);
+    rect(275, 150, 50, 25);
+    rect(125, 175, 150, 25);
+    rect(0, 225, 75, 25);
+    rect(325, 225, 75, 25);
+    rect(75, 250, 50, 25);
+    rect(275, 250, 50, 25);
+    rect(125, 275, 150, 25);
+    rect(0, 325, 75, 25);
+    rect(325, 325, 75, 25);
+    rect(75, 350, 50, 25);
+    rect(275, 350, 50, 25);
+    rect(125, 375, 150, 25);
+    
+    fill(100, 200, 255);//Bright blue
+    rect(125, 25, 150, 25);
+    rect(75, 0, 50, 25);
+    rect(275, 0, 50, 25);
+    rect(0, 75, 75, 25);
+    rect(325, 75, 75, 25);
+    rect(125, 125, 150, 25);
+    rect(75, 100, 50, 25);
+    rect(275, 100, 50, 25);
+    rect(0, 175, 75, 25);
+    rect(325, 175, 75, 25);
+    rect(125, 225, 150, 25);
+    rect(75, 200, 50, 25);
+    rect(275, 200, 50, 25);
+    rect(0, 275, 75, 25);
+    rect(325, 275, 75, 25);
+    rect(125, 325, 150, 25);
+    rect(75, 300, 50, 25);
+    rect(275, 300, 50, 25);
+    rect(0, 375, 75, 25);
+    rect(325, 375, 75, 25);
+    custom_images.push(get(0,0,400,400));
+    
+    noStroke();
+    background(165, 242, 243);
+    fill(0, 0, 255);
+    rect(115, 0, 20, 200);
+    rect(0, 190, 400, 20);
+    rect(265, 200, 20, 200);
+    rect(0, 0, 400, 10);
+    rect(0, 390, 400, 10);
+    custom_images.push(get(0,0,400,400));
+};
+
+
+initTilemap();
+init_custom_graphics();
+var iterations = 0;
+var a1 = [];
+var a2 = [];
+var points1 = [];
+var points2 = [];
+var otter = new AnimalObj(45, 30);
+var penguin = new AnimalObj(340, 120);
+
+var a1_tail_x1 = 60;
+var a1_tail_y1 = 125;
+var a1_tail_cx1 = 61;
+var a1_tail_cy1 = 145;
+var a1_tail_cx2 = 68;
+var a1_tail_cy2 = 187;
+var a1_tail_x2 = 85;
+var a1_tail_y2 = 200;
+var a1_tail_cx1Dir = 1;
+var a1_tail_cx2Dir = -0.5;
+var a1_tail_x2Dir = -1;
+
+var a2_tail_x1 = 340;
+var a2_tail_y1 = 225;
+var a2_tail_cx1 = 342;
+var a2_tail_cy1 = 238;
+var a2_tail_cx2 = 344;
+var a2_tail_cy2 = 242;
+var a2_tail_x2 = 350;
+var a2_tail_y2 = 254;
+var a2_tail_cx1Dir = 2;
+var a2_tail_cx2Dir = -1;
+var a2_tail_x2Dir = -2;
+
+var splitPoints_animal1 = function() {
+    a1.splice(0, a1.length);
+    for (var i = 0; i < points1.length - 1; i++) {
+        a1.push(new PVector(points1[i].x, points1[i].y));
+        a1.push(new PVector((points1[i].x + points1[i+1].x)/2, (points1[i].y +
+points1[i+1].y)/2));
+    }  
+    a1.push(new PVector(points1[i].x, points1[i].y));
+    a1.push(new PVector((points1[0].x + points1[i].x)/2, (points1[0].y +
+points1[i].y)/2));
+};  
+
+var average_animal1 = function() {
+    for (var i = 0; i < a1.length - 1; i++) {
+        var x = (a1[i].x + a1[i+1].x)/2;
+        var y = (a1[i].y + a1[i+1].y)/2;
+        a1[i].set(x, y);
+    } 
+    var x = (a1[i].x + points1[0].x)/2;
+    var y = (a1[i].y + points1[0].y)/2;
+    points1.splice(0, points1.length);
+    for (i = 0; i < a1.length; i++) {
+        points1.push(new PVector(a1[i].x, a1[i].y));   
+    }    
+};    
+
+var splitPoints_animal2 = function() {
+    a2.splice(0, a2.length);
+    for (var i = 0; i < points2.length - 1; i++) {
+        a2.push(new PVector(points2[i].x, points2[i].y));
+        a2.push(new PVector((points2[i].x + points2[i+1].x)/2, (points2[i].y +
+points2[i+1].y)/2));
+    }  
+    a2.push(new PVector(points2[i].x, points2[i].y));
+    a2.push(new PVector((points2[0].x + points2[i].x)/2, (points2[0].y +
+points2[i].y)/2));
+};  
+
+var average_animal2 = function() {
+    for (var i = 0; i < a2.length - 1; i++) {
+        var x = (a2[i].x + a2[i+1].x)/2;
+        var y = (a2[i].y + a2[i+1].y)/2;
+        a2[i].set(x, y);
+    } 
+    var x = (a2[i].x + points2[0].x)/2;
+    var y = (a2[i].y + points2[0].y)/2;
+    points2.splice(0, points2.length);
+    for (i = 0; i < a2.length; i++) {
+        points2.push(new PVector(a2[i].x, a2[i].y));   
+    }    
+};  
+
+var subdivide_animal1 = function() {
+    splitPoints_animal1();
+    average_animal1();
+};
+
+var subdivide_animal2 = function() {
+    splitPoints_animal2();
+    average_animal2();
+};  
+
+
+
+WallObj.prototype.draw = function()
+{
+    image(custom_images[1], this.x, this.y, 20, 20);
+};
+
+PathObj.prototype.draw = function()
+{
+    noStroke();
+    fill(118,85,43);
+    rect(this.x, this.y, 20, 20);
+};
+
+WaterObj.prototype.draw = function()
+{
+    image(custom_images[0], this.x, this.y, 20, 20);
+};
+
+
+points1.push(new PVector(otter.x, otter.y));
+points1.push(new PVector(otter.x+30, otter.y));
+points1.push(new PVector(otter.x+30, otter.y+30));
+points1.push(new PVector(otter.x+40, otter.y+60));
+points1.push(new PVector(otter.x+40, otter.y+80));
+points1.push(new PVector(otter.x+35, otter.y+90));
+points1.push(new PVector(otter.x+20, otter.y+100));
+points1.push(new PVector(otter.x+5, otter.y+100));
+points1.push(new PVector(otter.x-10, otter.y+90));
+points1.push(new PVector(otter.x-15, otter.y+60));
+points1.push(new PVector(otter.x, otter.y+30));
+
+points2.push(new PVector(penguin.x, penguin.y-15));
+points2.push(new PVector(penguin.x+20, penguin.y));
+points2.push(new PVector(penguin.x+20, penguin.y+20));
+points2.push(new PVector(penguin.x+30, penguin.y+60));
+points2.push(new PVector(penguin.x+20, penguin.y+100));
+points2.push(new PVector(penguin.x, penguin.y+110));
+points2.push(new PVector(penguin.x-20, penguin.y+100));
+points2.push(new PVector(penguin.x-30, penguin.y+60));
+points2.push(new PVector(penguin.x-20, penguin.y+20));
+points2.push(new PVector(penguin.x-20, penguin.y));
+
+draw = function ()
+{
+    background(0, 130, 0);
+    
+    for(var i=0; i<walls.length; i++)
+    {
+        walls[i].draw();
+    }
+    for(var i=0; i<paths.length; i++)
+    {
+        paths[i].draw();
+    }
+    for(var i=0; i<water.length; i++)
+    {
+        water[i].draw();
+    }
+    for(var i=0; i<fountains.length; i++)
+    {
+        fountains[i].execute();
+    }
+    
+    fill(222,184,135);
+    beginShape();
+    for (var i = 0; i < points1.length; i++)
+    {
+        vertex(points1[i].x, points1[i].y);   
+    }
+    vertex(points1[0].x, points1[0].y);
+    endShape();
+    
+    fill(222,184,135);
+    beginShape();
+    for (var i = 0; i < points1.length; i++)
+    {
+        vertex(points1[i].x, points1[i].y);   
+    }
+    vertex(points1[0].x, points1[0].y);
+    endShape();
+    
+    if (iterations < 5)
+    {
+        subdivide_animal1();
+        iterations++;
+    }
+    
+    fill(0,0,0);
+    ellipse(otter.x+8, otter.y+15, 6, 6);
+    ellipse(otter.x+22, otter.y+15, 6, 6);
+    stroke(0,0,0);
+    strokeWeight(2);
+    noFill();
+    arc(otter.x+15, otter.y+22, 8, 10, 0, 180);
+    line(otter.x+5, otter.y+40, otter.x-2, otter.y+60);
+    line(otter.x, otter.y+50, otter.x-8, otter.y+55);
+    line(otter.x, otter.y+50, otter.x+6, otter.y+58);
+    line(otter.x+22, otter.y+40, otter.x+29, otter.y+60);
+    line(otter.x+26, otter.y+50, otter.x+23, otter.y+60);
+    line(otter.x+26, otter.y+50, otter.x+35, otter.y+56);
+    
+    line(otter.x+5, otter.y+90, otter.x-2, otter.y+110);
+    line(otter.x, otter.y+100, otter.x-8, otter.y+105);
+    line(otter.x, otter.y+100, otter.x+6, otter.y+108);
+    line(otter.x+22, otter.y+90, otter.x+29, otter.y+110);
+    line(otter.x+26, otter.y+100, otter.x+23, otter.y+110);
+    line(otter.x+26, otter.y+100, otter.x+35, otter.y+106);
+    
+    stroke(101, 67, 33);
+    strokeWeight(6);
+    bezier(a1_tail_x1, a1_tail_y1, a1_tail_cx1, a1_tail_cy1, a1_tail_cx2, a1_tail_cy2, a1_tail_x2, a1_tail_y2);
+    a1_tail_cx1 += a1_tail_cx1Dir;
+    if ((a1_tail_cx1 > a1_tail_x2) || (a1_tail_cx1 < a1_tail_x1)) {a1_tail_cx1Dir = -a1_tail_cx1Dir;}
+    a1_tail_cx2 += a1_tail_cx2Dir;
+    if ((a1_tail_cx2 < a1_tail_x1) || (a1_tail_cx2 > a1_tail_x2)) {a1_tail_cx2Dir = -a1_tail_cx2Dir;}
+    a1_tail_x2 += a1_tail_x2Dir;
+    if ((abs(a1_tail_x1 - a1_tail_x2) > 20) || (a1_tail_x2 < a1_tail_x1)) {a1_tail_x2Dir = -a1_tail_x2Dir;}
+    
+    
+    fill(0, 0, 0);
+    noStroke();
+    beginShape();
+    for (var i = 0; i < points2.length; i++)
+    {
+        vertex(points2[i].x, points2[i].y);   
+    }    
+    vertex(points2[0].x, points2[0].y);
+    endShape();
+    
+    if (iterations < 5)
+    {
+        subdivide_animal2();
+        iterations++;
+    }
+    fill(0,0,0);
+    ellipse(penguin.x-14, penguin.y+100, 10, 40);
+    ellipse(penguin.x+14, penguin.y+100, 10, 40);
+    ellipse(penguin.x-20, penguin.y+50, 40, 10);
+    ellipse(penguin.x+20, penguin.y+50, 40, 10);
+    fill(255,255,255);
+    ellipse(penguin.x-8, penguin.y+4, 6, 6);
+    ellipse(penguin.x+8, penguin.y+4, 6, 6);
+    ellipse(penguin.x, penguin.y+70, 30, 70);
+    stroke(255,255,255);
+    strokeWeight(2);
+    noFill();
+    arc(penguin.x, penguin.y+12, 20, 12, 0, 180);
+    
+    stroke(255, 255, 255);
+    strokeWeight(4);
+    bezier(a2_tail_x1, a2_tail_y1, a2_tail_cx1, a2_tail_cy1, a2_tail_cx2, a2_tail_cy2, a2_tail_x2, a2_tail_y2);
+    a2_tail_cx1 += a2_tail_cx1Dir;
+    if ((a2_tail_cx1 > a2_tail_x2) || (a2_tail_cx1 < a2_tail_x1)) {a2_tail_cx1Dir = -a2_tail_cx1Dir;}
+    a2_tail_cx2 += a2_tail_cx2Dir;
+    if ((a2_tail_cx2 < a2_tail_x1) || (a2_tail_cx2 > a2_tail_x2)) {a2_tail_cx2Dir = -a2_tail_cx2Dir;}
+    a2_tail_x2 += a2_tail_x2Dir;
+    if ((abs(a2_tail_x1 - a2_tail_x2) > 20) || (a2_tail_x2 < a2_tail_x1)) {a2_tail_x2Dir = -a2_tail_x2Dir;}
+    
+};

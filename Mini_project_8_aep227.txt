@@ -1,0 +1,326 @@
+/*
+    Author: Addison Powell
+    Date: November 14, 2019
+    Comments: A simple 3D chair with a triangle cut in the back.
+    All sides have been textured with a solid brown color.
+
+    Notes: In Khan Academy, hit restart after pasting the code in. The translate
+    at the bottom doesn't always work on the first try. I'd also recommend changing
+    the translate parameters to get better views of the chair.
+
+    I couldn't figure out a way to make the textures properly cull lines behind them
+    without drawing them last, but then the "chair" ended up taking on a really flat
+    look with no definition. I couldn't think of an algorithm or anything that would
+    properly show the top lines and cull those "behind" a texture that wouldn't take
+    an incredibly long time to write, so I left it as is, with the textures being
+    drawn first, then the lines and the nodes. There are several extra nodes that
+    are used purely for the texturing process.
+*/
+
+
+var backgroundColour = color(255, 255, 255);
+var nodeColour = color(80, 168, 107);
+var edgeColour = color(34, 68, 204);
+var texColor = color(173, 87, 0);
+var nodeSize = 4;
+
+var node0 =  [120  , 0  , 0];
+var node1 =  [80  , 0  , 0];
+var node2 =  [80  , 40  , 0];
+var node3 =  [120  , 40  , 0];
+var node4 =  [40  , 0  , 0];
+var node5 =  [0   , 0  , 0];
+var node6 =  [0   , 40  , 0];
+var node7 =  [40  , 40  , 0];
+var node8 =  [40  , 80  , 0];
+var node9 =  [0   , 80  , 0];
+var node10 = [0   , 120  , 0];
+var node11 = [40  , 120  , 0];
+var node12 = [120  , 80  , 0];
+var node13 = [80  , 80  , 0];
+var node14 = [80  , 120  , 0];
+var node15 = [120  , 120  , 0];
+var node16 = [120  , 120  , 100];
+var node17 = [0  , 120  , 100];
+var node18 = [0  , 0  , 100];
+var node19 = [120  , 0  , 100];
+var node20 = [120  , 40  , 80];
+var node21 = [120  , 80  , 80];
+var node22 = [80  , 80  , 80];
+var node23 = [80  , 120  , 80];
+var node24 = [40  , 120  , 80];
+var node25 = [40  , 80  , 80];
+var node26 = [0  , 80  , 80];
+var node27 = [0  , 40  , 80];
+var node28 = [40  , 40  , 80];
+var node29 = [40  , 0  , 80];
+var node30 = [80  , 0  , 80];
+var node31 = [80  , 40  , 80];
+var node32 = [0  , 120  , 80];
+var node33 = [120  , 120  , 80];
+var node34 = [120  , 0  , 80];
+var node35 = [0  , 0  , 80];
+
+var node36 = [0  , 120  , 240];
+var node37 = [120  , 120  , 240];
+var node38 = [0  , 100  , 240];
+var node39 = [120  , 100  , 240];
+var node40 = [0  , 100  , 100];
+var node41 = [120  , 100  , 100];
+
+var node42 = [20  , 100 , 200];
+var node43 = [20  , 120 , 200];
+var node44 = [100 , 120 , 200];
+var node45 = [100 , 100 , 200];
+var node46 = [60  , 100 , 140];
+var node47 = [60  , 120 , 140];
+
+var node48 = [0  , 120 , 200];
+var node49 = [0  , 100 , 200];
+var node50 = [0  , 120 , 140];
+var node51 = [0  , 100 , 140];
+var node52 = [120  , 120 , 200];
+var node53 = [120  , 100 , 200];
+var node54 = [120  , 120 , 140];
+var node55 = [120  , 100 , 140];
+
+var nodes = [node0, node1, node2, node3, node4, node5, node6, node7, node8, node9, node10,
+             node11, node12, node13, node14, node15, node16, node17, node18, node19, node20,
+             node21, node22, node23, node24, node25, node26, node27, node28, node29, node30,
+             node31, node32, node33, node34, node35, node36, node37, node38, node39, node40,
+             node41, node42, node43, node44, node45, node46, node47, node48, node49, node50,
+             node51, node52, node53, node54, node55];
+
+var edge0 = [0, 1];
+var edge1 = [0, 3];
+var edge2 = [1, 2];
+var edge3 = [2, 3];
+
+var edge4 = [5, 4];
+var edge5 = [5, 6];
+var edge6 = [4, 7];
+var edge7 = [6, 7];
+
+var edge8 = [8, 9];
+var edge9 = [8, 11];
+var edge10 = [9, 10];
+var edge11 = [10, 11];
+
+var edge12 = [12, 13];
+var edge13 = [12, 15];
+var edge14 = [13, 14];
+var edge15 = [14, 15];
+
+var edge16 = [0, 34];
+var edge17 = [3, 20];
+var edge18 = [12, 21];
+var edge19 = [15, 33];
+var edge20 = [1, 30];
+var edge21 = [2, 31];
+var edge22 = [13, 22];
+var edge23 = [14, 23];
+var edge24 = [4, 29];
+var edge25 = [7, 28];
+var edge26 = [8, 25];
+var edge27 = [11, 24];
+var edge28 = [5, 35];
+var edge29 = [6, 27];
+var edge30 = [9, 26];
+var edge31 = [10, 32];
+
+var edge32 = [31, 20];
+var edge33 = [20, 21];
+var edge34 = [21, 22];
+var edge35 = [22, 23];
+var edge36 = [23, 24];
+var edge37 = [24, 25];
+var edge38 = [25, 26];
+var edge39 = [26, 27];
+var edge40 = [27, 28];
+var edge41 = [28, 29];
+var edge42 = [29, 30];
+var edge43 = [30, 31];
+
+var edge44 = [16, 17];
+var edge45 = [17, 18];
+var edge46 = [18, 19];
+var edge47 = [19, 16];
+
+var edge48 = [32, 17];
+
+var edge49 = [33, 16];
+
+var edge50 = [34, 19];
+
+var edge51 = [35, 18];
+
+var edge52 = [38, 36];
+var edge53 = [38, 39];
+var edge54 = [38, 40];
+var edge55 = [36, 37];
+var edge56 = [36, 17];
+var edge57 = [37, 16];
+var edge58 = [39, 37];
+var edge59 = [39, 41];
+var edge60 = [40, 41];
+
+var edge61 = [42, 43];
+var edge62 = [42, 46];
+var edge63 = [42, 45];
+var edge64 = [43, 44];
+var edge65 = [43, 47];
+var edge66 = [44, 47];
+var edge67 = [44, 45];
+var edge68 = [45, 46];
+var edge69 = [46, 47];
+
+var edges = [edge0,  edge1,  edge2,  edge3,  edge4,  edge5,  edge6,  edge7,  edge8,  edge9, edge10,
+             edge11, edge12, edge13, edge14, edge15, edge16, edge17, edge18, edge19, edge20,
+             edge21, edge22, edge23, edge24, edge25, edge26, edge27, edge28, edge29, edge30,
+             edge31, edge32, edge33, edge34, edge35, edge36, edge37, edge38, edge39, edge40,
+             edge41, edge42, edge43, edge44, edge45, edge46, edge47, edge48, edge49, edge50,
+             edge51, edge52, edge53, edge54, edge55, edge56, edge57, edge58, edge59, edge60,
+             edge61, edge62, edge63, edge64, edge65, edge66, edge67, edge68, edge69];
+
+// Rotate shape around the z-axis
+var rotateZ3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n<nodes.length; n++) {
+        var node = nodes[n];
+        var x = node[0];
+        var y = node[1];
+        node[0] = x * cosTheta - y * sinTheta;
+        node[1] = y * cosTheta + x * sinTheta;
+    }
+};
+
+var rotateY3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n<nodes.length; n++) {
+        var node = nodes[n];
+        var x = node[0];
+        var z = node[2];
+        node[0] = x * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + x * sinTheta;
+    }
+};
+
+var rotateX3D = function(theta) {
+    var sinTheta = sin(theta);
+    var cosTheta = cos(theta);
+    
+    for (var n=0; n<nodes.length; n++) {
+        var node = nodes[n];
+        var y = node[1];
+        var z = node[2];
+        node[1] = y * cosTheta - z * sinTheta;
+        node[2] = z * cosTheta + y * sinTheta;
+    }
+};
+//rotateZ3D(30);
+//rotateY3D(30);
+//rotateX3D(30);
+
+var draw= function() {
+    background(backgroundColour);
+    
+    //Draw textures
+    fill(texColor);
+    noStroke();
+    
+    //4 Feet
+    quad(nodes[0][0], nodes[0][1], nodes[3][0], nodes[3][1], nodes[2][0], nodes[2][1], nodes[1][0], nodes[1][1]);
+    quad(nodes[4][0], nodes[4][1], nodes[7][0], nodes[7][1], nodes[6][0], nodes[6][1], nodes[5][0], nodes[5][1]);
+    quad(nodes[8][0], nodes[8][1], nodes[11][0], nodes[11][1], nodes[10][0], nodes[10][1], nodes[9][0], nodes[9][1]);
+    quad(nodes[12][0], nodes[12][1], nodes[15][0], nodes[15][1], nodes[14][0], nodes[14][1], nodes[13][0], nodes[13][1]);
+    
+    //Left side
+    quad(nodes[5][0], nodes[5][1], nodes[6][0], nodes[6][1], nodes[27][0], nodes[27][1], nodes[35][0], nodes[35][1]);
+    quad(nodes[9][0], nodes[9][1], nodes[10][0], nodes[10][1], nodes[32][0], nodes[32][1], nodes[26][0], nodes[26][1]);
+    quad(nodes[35][0], nodes[35][1], nodes[32][0], nodes[32][1], nodes[17][0], nodes[17][1], nodes[18][0], nodes[18][1]);
+    
+    //Right side
+    quad(nodes[0][0], nodes[0][1], nodes[3][0], nodes[3][1], nodes[20][0], nodes[20][1], nodes[34][0], nodes[34][1]);
+    quad(nodes[34][0], nodes[34][1], nodes[33][0], nodes[33][1], nodes[16][0], nodes[16][1], nodes[19][0], nodes[19][1]);
+    quad(nodes[12][0], nodes[12][1], nodes[15][0], nodes[15][1], nodes[33][0], nodes[33][1], nodes[21][0], nodes[21][1]);
+
+    //Front side
+    quad(nodes[5][0], nodes[5][1], nodes[4][0], nodes[4][1], nodes[29][0], nodes[29][1], nodes[35][0], nodes[35][1]);
+    quad(nodes[1][0], nodes[1][1], nodes[0][0], nodes[0][1], nodes[34][0], nodes[34][1], nodes[30][0], nodes[30][1]);
+    quad(nodes[35][0], nodes[35][1], nodes[34][0], nodes[34][1], nodes[19][0], nodes[19][1], nodes[18][0], nodes[18][1]);
+        
+    //Back side
+    quad(nodes[14][0], nodes[14][1], nodes[15][0], nodes[15][1], nodes[33][0], nodes[33][1], nodes[23][0], nodes[23][1]);
+    quad(nodes[10][0], nodes[10][1], nodes[11][0], nodes[11][1], nodes[24][0], nodes[24][1], nodes[32][0], nodes[32][1]);
+    quad(nodes[32][0], nodes[32][1], nodes[33][0], nodes[33][1], nodes[16][0], nodes[16][1], nodes[17][0], nodes[17][1]);
+    
+    //Inside surfaces of legs
+    quad(nodes[4][0], nodes[4][1], nodes[7][0], nodes[7][1], nodes[28][0], nodes[28][1], nodes[29][0], nodes[29][1]);
+    quad(nodes[6][0], nodes[6][1], nodes[7][0], nodes[7][1], nodes[28][0], nodes[28][1], nodes[27][0], nodes[27][1]);
+    
+    quad(nodes[1][0], nodes[1][1], nodes[2][0], nodes[2][1], nodes[31][0], nodes[31][1], nodes[30][0], nodes[30][1]);
+    quad(nodes[2][0], nodes[2][1], nodes[3][0], nodes[3][1], nodes[20][0], nodes[20][1], nodes[31][0], nodes[31][1]);
+    
+    quad(nodes[12][0], nodes[12][1], nodes[13][0], nodes[13][1], nodes[22][0], nodes[22][1], nodes[21][0], nodes[21][1]);
+    quad(nodes[13][0], nodes[13][1], nodes[14][0], nodes[14][1], nodes[23][0], nodes[23][1], nodes[22][0], nodes[22][1]);
+    
+    quad(nodes[8][0], nodes[8][1], nodes[11][0], nodes[11][1], nodes[24][0], nodes[24][1], nodes[25][0], nodes[25][1]);
+    quad(nodes[8][0], nodes[8][1], nodes[9][0], nodes[9][1], nodes[26][0], nodes[26][1], nodes[25][0], nodes[25][1]);
+    
+    //Seat
+    quad(nodes[16][0], nodes[16][1], nodes[17][0], nodes[17][1], nodes[18][0], nodes[18][1], nodes[19][0], nodes[19][1]);
+
+    //Back of the chair
+    quad(nodes[40][0], nodes[40][1], nodes[17][0], nodes[17][1], nodes[36][0], nodes[36][1], nodes[38][0], nodes[38][1]);
+    quad(nodes[38][0], nodes[38][1], nodes[39][0], nodes[39][1], nodes[37][0], nodes[37][1], nodes[36][0], nodes[36][1]);
+    quad(nodes[41][0], nodes[41][1], nodes[16][0], nodes[16][1], nodes[37][0], nodes[37][1], nodes[39][0], nodes[39][1]);
+    
+    quad(nodes[48][0], nodes[48][1], nodes[52][0], nodes[52][1], nodes[37][0], nodes[37][1], nodes[36][0], nodes[36][1]);
+    quad(nodes[49][0], nodes[49][1], nodes[53][0], nodes[53][1], nodes[39][0], nodes[39][1], nodes[38][0], nodes[38][1]);
+    
+    quad(nodes[48][0], nodes[48][1], nodes[43][0], nodes[43][1], nodes[47][0], nodes[47][1], nodes[50][0], nodes[50][1]);
+    quad(nodes[49][0], nodes[49][1], nodes[42][0], nodes[42][1], nodes[46][0], nodes[46][1], nodes[51][0], nodes[51][1]);
+    
+    quad(nodes[52][0], nodes[52][1], nodes[44][0], nodes[44][1], nodes[47][0], nodes[47][1], nodes[54][0], nodes[54][1]);
+    quad(nodes[53][0], nodes[53][1], nodes[45][0], nodes[45][1], nodes[46][0], nodes[46][1], nodes[55][0], nodes[55][1]);
+    
+    quad(nodes[50][0], nodes[50][1], nodes[54][0], nodes[54][1], nodes[16][0], nodes[16][1], nodes[17][0], nodes[17][1]);
+    quad(nodes[51][0], nodes[51][1], nodes[55][0], nodes[55][1], nodes[41][0], nodes[41][1], nodes[40][0], nodes[40][1]);
+    
+    quad(nodes[42][0], nodes[42][1], nodes[43][0], nodes[43][1], nodes[44][0], nodes[44][1], nodes[45][0], nodes[45][1]);
+    quad(nodes[42][0], nodes[42][1], nodes[43][0], nodes[43][1], nodes[47][0], nodes[47][1], nodes[46][0], nodes[46][1]);
+    quad(nodes[44][0], nodes[44][1], nodes[45][0], nodes[45][1], nodes[46][0], nodes[46][1], nodes[47][0], nodes[47][1]);
+
+    
+    
+    // Draw edges
+    stroke(edgeColour);
+    for (var e=0; e<edges.length; e++) {
+        var n0 = edges[e][0];
+        var n1 = edges[e][1];
+        var node0 = nodes[n0];
+        var node1 = nodes[n1];
+        line(node0[0], node0[1], node1[0], node1[1]);
+    }
+
+    // Draw nodes
+    fill(nodeColour);
+    noStroke();
+    for (var n=0; n<nodes.length; n++) {
+        var node = nodes[n];
+        ellipse(node[0], node[1], nodeSize, nodeSize);
+    }
+    
+};
+
+mouseDragged = function() {
+    rotateY3D(mouseX - pmouseX);
+    rotateX3D(mouseY - pmouseY);
+};
+
+translate(200, 300);
+

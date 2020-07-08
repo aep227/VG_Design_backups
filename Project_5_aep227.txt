@@ -1,0 +1,1032 @@
+/*
+    Author: Addison Powell
+    Date: October 11, 2019
+    Comments: A different take on the dodgeball concept. The player 
+    controls a crossbow in the bottom center of the screen and fires
+    arrows towards enemy knights trying to breach the castle gate.
+    The knights will try to dodge arrows that are too close based on their
+    angle/trajectory and position relative to the knight.
+    Added in a "power-up" in the form of a "holy arrow." The player has
+    1 holy arrow to use in the game. Normally knights need to be hit with
+    3 arrows to be killed, but the holy arrow will take down a knight in
+    1 shot. The knights also won't try to dodge against the holy arrow.
+    Arrows will bounce off the knights and fly in a different direction.
+    Even though arrows can sometimes bounce off knights multiple times,
+    they will only ever harm the first knight hit. Once an arrow hits a
+    wall it will become stuck and stop moving and remain there for the
+    rest of the game.
+    
+    The only bug I know of is that occasionally an arrow will get stuck
+    in a knight and spin around before eventually "bouncing" away from it
+*/
+
+//Used in the various game states. 0 = start screen, 1 = game screen
+//2 = victory screen, 3 = defeat screen
+var screen_state = 0;
+var f = createFont("Copperplate Gothic");
+var knights_alive = 3;
+
+//Physics variables
+var gravity = new PVector(0, 0.1);
+
+var start_box = function (x, y, r, g, b) {
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.g = g;
+    this.b = b;
+};
+
+start_box.prototype.display = function () {
+    fill(this.r, this.g, this.b);
+    noStroke();
+    rect(this.x, this.y, 250, 50);
+    fill(255, 255, 0);
+    rect(this.x, this.y, 250, 2);
+    rect(this.x, this.y + 48, 250, 2);
+    rect(this.x, this.y, 2, 50);
+    rect(this.x + 248, this.y, 2, 50);
+    fill(0, 0, 0);
+    textFont(f, 24);
+    text("START", this.x + 85, this.y + 32);
+};
+
+var tilemap = [
+    "wwwwwwwwwwwwwwwwwwww",
+    "wwwwwwwwwwwwwwwwwwww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",//space for the castle gate graphic and bridge graphic
+    "                    ",
+    "                    ",
+    "                    ",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "rr                ww",
+    "wwwwwwwwwwwwwwwwwwww",
+    "wwwwwwwwwwwwwwwwwwww",
+];
+
+var WallObj = function (x, y) {
+    this.x = x;
+    this.y = y;
+};
+
+var WaterObj = function (x, y) {
+    this.x = x;
+    this.y = y;
+};
+
+var PCObj = function (x, y) {
+    this.x = x;
+    this.y = y;
+    this.angle = 0;
+    this.holy_arrow = 1;
+    this.frame = 0;
+};
+
+var EnemyObj = function (x, y, speed) {
+    this.x = x;
+    this.y = y;
+    this.speed = speed;
+    this.currFrameCount = 0;
+    this.facing = "R";
+    this.health = 3;
+    this.dodgeR = 0;
+    this.dodgeL = 0;
+};
+
+var ArrowObj = function (x, y, angle, holy_arrow) {
+    this.x = x;
+    this.y = y;
+    this.speed = 5;
+    this.angle = angle;
+    this.holy_arrow = holy_arrow;
+    this.hit = 1;
+    this.visible = 1;
+    this.moving = 1;
+};
+
+var start_box1 = new start_box(80, 320, 240, 200, 0);
+var keyArray = [];
+var custom_images = []; //List custom graphics
+
+//Arrays for holding entity locations from the tilemap
+var walls = [];
+var enemies = [];
+var water = [];
+var arrows = [];
+
+var player = new PCObj(185, 330);
+
+//Creates the knight enemies
+enemies.push(new EnemyObj(0, 100, 0.3));
+enemies.push(new EnemyObj(50, 110, 0.3));
+enemies.push(new EnemyObj(20, 130, 0.3));
+
+var init_custom_graphics = function () {
+    //Walls = 0; Water = 1; Player = 5
+    //Enemies facing right, 3 (full) health = 2
+    //Enemies facing right, 2 health = 3
+    //Enemies facing right, 1 health = 4
+    noStroke();
+    background(200, 200, 200);
+    fill(120, 120, 120);
+    rect(0, 175, 400, 25);
+    rect(100, 0, 25, 175);
+    rect(275, 200, 25, 200);
+    fill(230, 230, 230);
+    rect(0, 0, 100, 25);
+    rect(125, 0, 275, 25);
+    rect(125, 0, 25, 175);
+    rect(0, 200, 275, 25);
+    rect(300, 200, 100, 25);
+    rect(300, 200, 25, 200);
+    fill(150, 150, 150);
+    rect(75, 25, 25, 150);
+    rect(250, 225, 25, 175);
+    custom_images.push(get(0, 0, 400, 400));
+
+    //Water tile
+    noStroke();
+    background(180, 230, 255);
+    fill(40, 40, 160);//Dark blue
+    rect(0, 0, 75, 25);
+    rect(325, 0, 75, 25);
+    rect(75, 25, 50, 25);
+    rect(275, 25, 50, 25);
+    rect(125, 50, 150, 25);
+    rect(0, 100, 75, 25);
+    rect(325, 100, 75, 25);
+    rect(75, 125, 50, 25);
+    rect(275, 125, 50, 25);
+    rect(125, 150, 150, 25);
+    rect(0, 200, 75, 25);
+    rect(325, 200, 75, 25);
+    rect(75, 225, 50, 25);
+    rect(275, 225, 50, 25);
+    rect(125, 250, 150, 25);
+    rect(0, 300, 75, 25);
+    rect(325, 300, 75, 25);
+    rect(75, 325, 50, 25);
+    rect(275, 325, 50, 25);
+    rect(125, 350, 150, 25);
+    fill(30, 160, 255);//Medium blue
+    rect(0, 25, 75, 25);
+    rect(325, 25, 75, 25);
+    rect(75, 50, 50, 25);
+    rect(275, 50, 50, 25);
+    rect(125, 75, 150, 25);
+    rect(0, 125, 75, 25);
+    rect(325, 125, 75, 25);
+    rect(75, 150, 50, 25);
+    rect(275, 150, 50, 25);
+    rect(125, 175, 150, 25);
+    rect(0, 225, 75, 25);
+    rect(325, 225, 75, 25);
+    rect(75, 250, 50, 25);
+    rect(275, 250, 50, 25);
+    rect(125, 275, 150, 25);
+    rect(0, 325, 75, 25);
+    rect(325, 325, 75, 25);
+    rect(75, 350, 50, 25);
+    rect(275, 350, 50, 25);
+    rect(125, 375, 150, 25);
+    fill(100, 200, 255);//Bright blue
+    rect(125, 25, 150, 25);
+    rect(75, 0, 50, 25);
+    rect(275, 0, 50, 25);
+    rect(0, 75, 75, 25);
+    rect(325, 75, 75, 25);
+    rect(125, 125, 150, 25);
+    rect(75, 100, 50, 25);
+    rect(275, 100, 50, 25);
+    rect(0, 175, 75, 25);
+    rect(325, 175, 75, 25);
+    rect(125, 225, 150, 25);
+    rect(75, 200, 50, 25);
+    rect(275, 200, 50, 25);
+    rect(0, 275, 75, 25);
+    rect(325, 275, 75, 25);
+    rect(125, 325, 150, 25);
+    rect(75, 300, 50, 25);
+    rect(275, 300, 50, 25);
+    rect(0, 375, 75, 25);
+    rect(325, 375, 75, 25);
+    custom_images.push(get(0, 0, 400, 400));
+
+    background(255, 255, 255, 0);
+    stroke(0, 0, 0);
+    strokeWeight(2);
+    line(64, 58, 64, 70);
+    line(64, 70, 60, 80);
+    line(64, 70, 68, 80);
+    line(64, 62, 74, 66);
+    line(64, 62, 53, 70);
+    noStroke();
+    fill(0, 255, 0);
+    rect(70, 54, 10, 14);
+    triangle(70, 68, 80, 68, 75, 80);
+    rect(59, 50, 10, 8);
+    rect(53, 51, 2, 20);
+    rect(51, 64, 6, 2);
+    fill(0, 0, 0);
+    rect(60, 52, 3, 2);
+    rect(65, 52, 3, 2);
+    custom_images.push(get(50, 50, 30, 30));
+
+    background(255, 255, 255, 0);
+    stroke(0, 0, 0);
+    strokeWeight(2);
+    line(64, 58, 64, 70);
+    line(64, 70, 60, 80);
+    line(64, 70, 68, 80);
+    line(64, 62, 74, 66);
+    line(64, 62, 53, 70);
+    noStroke();
+    fill(255, 255, 0);
+    rect(70, 54, 10, 14);
+    triangle(70, 68, 80, 68, 75, 80);
+    rect(59, 50, 10, 8);
+    rect(53, 51, 2, 20);
+    rect(51, 64, 6, 2);
+    fill(0, 0, 0);
+    rect(60, 52, 3, 2);
+    rect(65, 52, 3, 2);
+    custom_images.push(get(50, 50, 30, 30));
+
+    background(255, 255, 255, 0);
+    stroke(0, 0, 0);
+    strokeWeight(2);
+    line(64, 58, 64, 70);
+    line(64, 70, 60, 80);
+    line(64, 70, 68, 80);
+    line(64, 62, 74, 66);
+    line(64, 62, 53, 70);
+    noStroke();
+    fill(255, 0, 0);
+    rect(70, 54, 10, 14);
+    triangle(70, 68, 80, 68, 75, 80);
+    rect(59, 50, 10, 8);
+    rect(53, 51, 2, 20);
+    rect(51, 64, 6, 2);
+    fill(0, 0, 0);
+    rect(60, 52, 3, 2);
+    rect(65, 52, 3, 2);
+    custom_images.push(get(50, 50, 30, 30));
+};
+
+
+WallObj.prototype.draw = function () 
+{
+    image(custom_images[0], this.x, this.y, 20, 20);
+};
+
+WaterObj.prototype.draw = function ()
+ {
+    image(custom_images[1], this.x, this.y, 20, 20);
+};
+
+//Enemy update function
+//Checks for arrows in a box beneath itself and determines based on the
+//arrows in the box if it should dodge, and it what direction.
+//Also determines if an arrow is a holy arrow and shouldn't try to dodge
+//against it
+EnemyObj.prototype.update = function () 
+{
+    for (var i = 0; i < arrows.length; i++) {
+        if (arrows[i].hit === 1) {
+            if (arrows[i].x + 15 > this.x - 25 && arrows[i].x + 15 < this.x + 55 && arrows[i].y + 10 > this.y + 30 && arrows[i].y + 10 < this.y + 80 && arrows[i].moving === 1 && arrows[i].holy_arrow === 0) {
+                if (arrows[i].angle < 0) {
+                    if (arrows[i].x > this.x + 30) {
+                        this.dodgeL = 1;
+                    }
+                    else {
+                        this.dodgeR = 1;
+                    }
+                }
+                else if (arrows[i].angle >= 0) {
+                    if (arrows[i].x < this.x) {
+                        this.dodgeR = 1;
+                    }
+                    else {
+                        this.dodgeL = 1;
+                    }
+                }
+            }
+            if (arrows[i].x + 15 < this.x + 28 && arrows[i].x + 15 > this.x + 2 &&
+                arrows[i].y + 10 < this.y + 28 && arrows[i].y + 10 > this.y) {
+                if (this.health > 0)
+                {
+                    arrows[i].hit = 0;
+                    this.health -= 1;
+                    if (arrows[i].holy_arrow === 1)
+                    {
+                        this.health -= 2;
+                    }
+                }
+                if(this.health <= 0)
+                {
+                    knights_alive -= 1;
+                }
+            }
+        }
+    }
+    //Dodging functions. Increased speed during a dodge to represent a quick sprint out the way of an arrow
+    if (this.currFrameCount < frameCount - 2)
+     {
+        if (this.dodgeR === 1) {
+            this.x += this.speed * 3;
+            this.facing = "R";
+            this.dodgeR = 0;
+        }
+        else if (this.dodgeL === 1) {
+            this.x -= this.speed * 3;
+            this.facing = "L";
+            this.dodgeL = 0;
+        }
+        else {
+            this.x += this.speed;
+            this.facing = "R";
+        }
+    }
+};
+
+//Draws the enemies based on health remaining and facing
+EnemyObj.prototype.draw = function () {
+    if (this.facing === "L") {
+        if (this.health === 3) {
+            pushMatrix();
+            scale(-1.0, 1.0);
+            image(custom_images[2], -this.x, this.y, -30, 30);
+            popMatrix();
+        }
+        else if (this.health === 2) {
+            pushMatrix();
+            scale(-1.0, 1.0);
+            image(custom_images[3], -this.x, this.y, -30, 30);
+            popMatrix();
+        }
+        else if (this.health === 1) {
+            pushMatrix();
+            scale(-1.0, 1.0);
+            image(custom_images[4], -this.x, this.y, -30, 30);
+            popMatrix();
+        }
+        else if (this.health <= 0) {
+            //Use the red color, but rotate 90 degrees so it's "lying down"
+            pushMatrix();
+            translate(this.x + 15, this.y + 15);
+            rotate(90);
+            translate(-this.x - 15, -this.y - 15);
+            scale(-1.0, 1.0);
+            image(custom_images[4], -this.x, this.y, -30, 30);
+            popMatrix();
+        }
+    }
+    else if (this.facing === "R") {
+        if (this.health === 3) {
+            image(custom_images[2], this.x, this.y, 30, 30);
+        }
+        else if (this.health === 2) {
+            image(custom_images[3], this.x, this.y, 30, 30);
+        }
+        else if (this.health === 1) {
+            image(custom_images[4], this.x, this.y, 30, 30);
+        }
+        else if (this.health <= 0) {
+            //Use the red color, but rotate 90 degrees so it's "lying down"
+            pushMatrix();
+            translate(this.x + 15, this.y + 15);
+            rotate(-90);
+            translate(-this.x - 15, -this.y - 15);
+            image(custom_images[4], this.x, this.y, 30, 30);
+            popMatrix();
+        }
+    }
+};
+
+//Updates the angle of the player turret and takes in player inputs
+PCObj.prototype.update = function () {
+    if (keyArray[87] === 1)//W is pressed. Fire Holy Arrow
+    {
+        if (this.frame < frameCount - 30) {
+            this.frame = frameCount;
+            if (this.holy_arrow > 0) {
+                arrows.push(new ArrowObj(player.x, player.y - 15, this.angle, 1));
+                this.holy_arrow -= 1;
+            }
+            else {
+                arrows.push(new ArrowObj(player.x, player.y - 15, this.angle, 0));
+            }
+        }
+    }
+    if (keyArray[83] === 1)//S is pressed. Fire arrow
+    {
+        if (this.frame < frameCount - 30) {
+            this.frame = frameCount;
+            arrows.push(new ArrowObj(player.x, player.y - 15, this.angle, 0));
+        }
+    }
+
+    if (keyArray[65] === 1)//A is pressed. Rotate left.
+    {
+        if (this.angle > -50) {
+            this.angle -= 2;
+        }
+    }
+    if (keyArray[68] === 1)//D is pressed. Rotate right.
+    {
+        if (this.angle < 50) {
+            this.angle += 2;
+        }
+    }
+};
+
+//Simply draws the player turret based on the angle
+PCObj.prototype.draw = function () {
+    pushMatrix();
+    translate(this.x + 15, this.y + 15);
+    rotate(this.angle);
+    translate(-this.x - 15, -this.y - 15);
+    noStroke();
+    fill(140, 100, 80);//Wooden stock
+    rect(this.x + 10, this.y + 2, 10, 26);
+    stroke(180, 180, 180);//Steel bracing
+    strokeWeight(3);
+    line(this.x + 10, this.y + 2, this.x + 2, this.y + 10);
+    line(this.x + 10, this.y + 2, this.x + 20, this.y + 2);
+    line(this.x + 20, this.y + 2, this.x + 28, this.y + 10);
+    stroke(230, 180, 140);//Bow string
+    strokeWeight(2);
+    line(this.x + 2, this.y + 10, this.x + 15, this.y + 20);
+    line(this.x + 28, this.y + 10, this.x + 15, this.y + 20);
+    stroke(0, 0, 0);//Arrow
+    line(this.x + 15, this.y + 6, this.x + 15, this.y + 20);
+    line(this.x + 15, this.y + 6, this.x + 12, this.y + 9);
+    line(this.x + 15, this.y + 6, this.x + 18, this.y + 9);
+    line(this.x + 15, this.y + 20, this.x + 12, this.y + 25);
+    line(this.x + 15, this.y + 20, this.x + 18, this.y + 25);
+    popMatrix();
+};
+
+//Simple bridge graphic over the water on the left side of the screen
+var draw_bridge = function () {
+    noStroke();
+    fill(230, 180, 140);
+    rect(0, 100, 40, 60);
+    fill(170, 130, 90);
+    rect(0, 100, 40, 4);
+    rect(0, 156, 40, 4);
+};
+
+//Gate graphic on the right side of the screen
+var draw_gate = function () {
+    fill(67, 70, 75);
+    noStroke();
+    rect(360, 100, 4, 54);
+    triangle(360, 154, 364, 154, 362, 160);
+    rect(370, 100, 4, 54);
+    triangle(370, 154, 374, 154, 372, 160);
+    rect(380, 100, 4, 54);
+    triangle(380, 154, 384, 154, 382, 160);
+    rect(390, 100, 4, 54);
+    triangle(390, 154, 394, 154, 392, 160);
+    rect(360, 111, 30, 4);
+    rect(360, 122, 30, 4);
+    rect(360, 133, 30, 4);
+    rect(360, 144, 30, 4);
+};
+
+//Updates arrow position. Detects contact with a knight (to change angle and "bounce" off a knight) or get stuck in a wall
+ArrowObj.prototype.update = function () {
+    if (this.moving === 1) {
+        this.x = this.x - (this.speed * cos(this.angle + 90));
+        this.y = this.y - (this.speed * sin(this.angle + 90));
+        for (var i = 0; i < enemies.length; i++) {
+            if (this.x + 15 < enemies[i].x + 28 && this.x + 15 > enemies[i].x + 2 &&
+                this.y + 10 < enemies[i].y + 28 && this.y + 10 > enemies[i].y && enemies[i].health > 0) {
+                this.angle += 90;
+            }
+        }
+    }
+    //Check if arrow hits a wall and therefore shouldn't be updated again
+    if ((this.x > 0 && this.y < 26) || (this.x > 0 && this.y > 340) || (this.x > 340)) {
+        this.moving = 0;
+    }
+    //If the arrow is out of the screen, don't draw it
+    if (this.x < -30) {
+        this.visible = 0;
+    }
+};
+
+//Simple function to draw the arrow
+ArrowObj.prototype.draw = function ()
+{
+    pushMatrix();
+    translate(this.x + 15, this.y + 15);
+    rotate(this.angle);
+    translate(-this.x - 15, -this.y - 15);
+    if (this.holy_arrow === 1)
+    {
+        stroke(255, 255, 0);
+    }
+    else
+    {
+        stroke(0, 0, 0);
+    }
+    strokeWeight(2);
+    line(this.x + 15, this.y + 6, this.x + 15, this.y + 20);
+    line(this.x + 15, this.y + 6, this.x + 12, this.y + 9);
+    line(this.x + 15, this.y + 6, this.x + 18, this.y + 9);
+    line(this.x + 15, this.y + 20, this.x + 12, this.y + 25);
+    line(this.x + 15, this.y + 20, this.x + 18, this.y + 25);
+    popMatrix();
+};
+
+var keyPressed = function ()
+{
+    keyArray[keyCode] = 1;
+};
+
+var keyReleased = function () {
+    keyArray[keyCode] = 0;
+};
+
+//Loads the entity locations from the tilemap
+var initTilemap = function () {
+    for (var i = 0; i < tilemap.length; i++) {
+        for (var j = 0; j < tilemap[i].length; j++) {
+            switch (tilemap[i][j]) {
+                case 'w': walls.push(new WallObj(j * 20, i * 20));
+                    break;
+                case 'r': water.push(new WaterObj(j * 20, i * 20));
+                    break;
+            }
+        }
+    }
+};
+
+
+initTilemap();
+init_custom_graphics();
+
+draw = function () {
+    if (screen_state === 0)//Draws the "start screen" until the button is clicked
+    {
+        background(200, 200, 200);
+        textFont(f, 32);
+        fill(100, 100, 100);
+        text("Castle Defense", 60, 40);
+        textFont(f, 18);
+        text("Shoot arrows at the knights to stop\nthem from reaching the castle gate!\nIt takes 3 arrows to kill 1 knight.\nThey change colors as they take damage.\nThe knights will attempt to dodge your\narrows! \nYou have 1 Holy Arrow at your disposal!\nKnights die instantly to it and can't\nattempt to dodge it!", 10, 64);
+        text("Controls:\nHold W = Fire Holy Arrow\nHold  S = Fire Arrow\na = Aim Left                       d = Aim Right", 10, 250);
+        start_box1.display();
+        if (mouseIsPressed) {
+            if (mouseX > start_box1.x && mouseX < start_box1.x + 250 &&
+                mouseY > start_box1.y && mouseY < start_box1.y + 50) {
+                screen_state = 1;
+            }
+        }
+    }
+
+    if (screen_state === 1)//Main game screen
+    {
+        background(60, 160, 0);
+        draw_bridge();
+        draw_gate();
+        //Update and draw all entities
+        player.update();
+        player.draw();
+        for (var i = 0; i < walls.length; i++) {
+            walls[i].draw();
+        }
+        for (var i = 0; i < water.length; i++) {
+            water[i].draw();
+        }
+        for (i = 0; i < enemies.length; i++) {
+            if (enemies[i].health > 0)
+            {
+                enemies[i].update();
+            }
+            enemies[i].draw();
+            if (enemies[i].x >= 360)//If knight moves to gate, player loses
+            {
+                screen_state = 3;
+            }
+        }
+        for (var i = 0; i < arrows.length; i++) {
+            if (arrows[i].moving === 1) {
+                arrows[i].update();
+            }
+            if (arrows[i].visible === 1) {
+                arrows[i].draw();
+            }
+        }
+
+        if (knights_alive === 0) {
+            screen_state = 2;
+        }
+
+    }
+    if (screen_state === 2)//Victory screen
+    {
+        background(0, 200, 230);
+        fill(0, 0, 0);
+        textFont(f, 26);
+        text("You saved your kingdom!", 30, 40);
+        noStroke();
+        fill(0, 170, 0);
+        rect(0, 220, 400, 180);
+        fill(150, 150, 150);//Main tower
+        rect(120, 160, 160, 140);
+        rect(115, 150, 10, 10);
+        rect(135, 150, 10, 10);
+        rect(155, 150, 10, 10);
+        rect(175, 150, 10, 10);
+        rect(195, 150, 10, 10);
+        rect(215, 150, 10, 10);
+        rect(235, 150, 10, 10);
+        rect(255, 150, 10, 10);
+        rect(275, 150, 10, 10);
+        //Main tower brick lines
+        stroke(0, 0, 0);
+        strokeWeight(1);
+        for(var i = 0; i < 9; i++)
+        {
+            line(120, 165+(i*10), 279, 165+(i*10));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(130, 165+(i*20), 130, 175+(i*20));
+            line(150, 165+(i*20), 150, 175+(i*20));
+            line(170, 165+(i*20), 170, 175+(i*20));
+            line(190, 165+(i*20), 190, 175+(i*20));
+            line(210, 165+(i*20), 210, 175+(i*20));
+            line(230, 165+(i*20), 230, 175+(i*20));
+            line(250, 165+(i*20), 250, 175+(i*20));
+            line(270, 165+(i*20), 270, 175+(i*20));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(140, 175+(i*20), 140, 185+(i*20));
+            line(160, 175+(i*20), 160, 185+(i*20));
+            line(180, 175+(i*20), 180, 185+(i*20));
+            line(200, 175+(i*20), 200, 185+(i*20));
+            line(220, 175+(i*20), 220, 185+(i*20));
+            line(240, 175+(i*20), 240, 185+(i*20));
+            line(260, 175+(i*20), 260, 185+(i*20));
+        }
+        noStroke();
+        fill(180, 180, 180);//Base
+        rect(40, 260, 320, 100);
+        rect(95, 250, 10, 10);
+        rect(115, 250, 10, 10);
+        rect(135, 250, 10, 10);
+        rect(155, 250, 10, 10);
+        rect(235, 250, 10, 10);
+        rect(255, 250, 10, 10);
+        rect(275, 250, 10, 10);
+        rect(295, 250, 10, 10);
+        fill(200, 200, 200);//Left tower
+        rect(40, 200, 60, 160);
+        rect(35, 190, 10, 10);
+        rect(55, 190, 10, 10);
+        rect(75, 190, 10, 10);
+        rect(95, 190, 10, 10);
+        rect(300, 200, 60, 160);//Right tower
+        rect(295, 190, 10, 10);
+        rect(315, 190, 10, 10);
+        rect(335, 190, 10, 10);
+        rect(355, 190, 10, 10);
+        rect(160, 240, 80, 120);//Center tower
+        rect(155, 230, 10, 10);
+        rect(175, 230, 10, 10);
+        rect(195, 230, 10, 10);
+        rect(215, 230, 10, 10);
+        rect(235, 230, 10, 10);
+        //Flag poles
+        stroke(160, 90, 40);
+        strokeWeight(3);
+        line(140, 80, 140, 148);
+        line(260, 80, 260, 148);
+        noStroke();
+        fill(255, 0, 0);
+        triangle(140, 80, 140, 100, 185, 90);
+        triangle(260, 80, 260, 100, 305, 90);
+        //Windows
+        fill(0, 0, 0);
+        rect(130, 185, 22, 40);
+        rect(190, 185, 22, 40);
+        rect(250, 185, 22, 40);
+        ellipse(141, 185, 22, 22);
+        ellipse(201, 185, 22, 22);
+        ellipse(261, 185, 22, 22);
+        //Brick lines
+        stroke(0, 0, 0);
+        strokeWeight(1);
+        //Left tower
+        for(var i = 0; i < 16; i++)
+        {
+            line(40, 200+(i*10), 99, 200+(i*10));
+        }
+        for(i = 0; i < 8; i++)
+        {
+            line(60, 200+(i*20), 60, 210+(i*20));
+            line(80, 200+(i*20), 80, 210+(i*20));
+        }
+        for(i = 0; i < 8; i++)
+        {
+            line(50, 210+(i*20), 50, 220+(i*20));
+            line(70, 210+(i*20), 70, 220+(i*20));
+            line(90, 210+(i*20), 90, 220+(i*20));
+        }
+        //Right tower
+        for(var i = 0; i < 16; i++)
+        {
+            line(300, 200+(i*10), 359, 200+(i*10));
+        }
+        for(i = 0; i < 8; i++)
+        {
+            line(320, 200+(i*20), 320, 210+(i*20));
+            line(340, 200+(i*20), 340, 210+(i*20));
+        }
+        for(i = 0; i < 8; i++)
+        {
+            line(310, 210+(i*20), 310, 220+(i*20));
+            line(330, 210+(i*20), 330, 220+(i*20));
+            line(350, 210+(i*20), 350, 220+(i*20));
+        }
+        //Center tower
+        for(var i = 0; i <12; i++)
+        {
+            line(160, 240+(i*10), 239, 240+(i*10));
+        }
+        for(i = 0; i < 3; i++)
+        {
+            line(180, 240+(i*20), 180, 250+(i*20));
+            line(200, 240+(i*20), 200, 250+(i*20));
+            line(220, 240+(i*20), 220, 250+(i*20));
+        }
+        for(i = 0; i < 6; i++)
+        {
+            line(170, 250+(i*20), 170, 260+(i*20));
+            line(190, 250+(i*20), 190, 260+(i*20));
+            line(210, 250+(i*20), 210, 260+(i*20));
+            line(230, 250+(i*20), 230, 260+(i*20));
+        }
+        //Left base
+        for(var i = 0; i < 10; i++)
+        {
+            line(100, 265+(i*10), 159, 265+(i*10));
+        }
+        for(i = 0; i < 5; i++)
+        {
+            line(110, 265+(i*20), 110, 275+(i*20));
+            line(130, 265+(i*20), 130, 275+(i*20));
+            line(150, 265+(i*20), 150, 275+(i*20));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(120, 275+(i*20), 120, 285+(i*20));
+            line(140, 275+(i*20), 140, 285+(i*20));
+        }
+        //Right base
+        for(var i = 0; i < 10; i++)
+        {
+            line(240, 265+(i*10), 299, 265+(i*10));
+        }
+        for(i = 0; i < 5; i++)
+        {
+            line(250, 265+(i*20), 250, 275+(i*20));
+            line(270, 265+(i*20), 270, 275+(i*20));
+            line(290, 265+(i*20), 290, 275+(i*20));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(260, 275+(i*20), 260, 285+(i*20));
+            line(280, 275+(i*20), 280, 285+(i*20));
+        }
+        noStroke();
+        fill(140, 70, 20);//Gate
+        rect(180, 300, 40, 60);
+        ellipse(200, 300, 40, 40);
+        stroke(0, 0, 0);
+        line(200, 280, 200, 358);//Gate "boards"
+        line(189, 283, 189, 358);
+        line(211, 283, 211, 358);
+    }
+
+    if (screen_state === 3)//Defeat screen
+    {
+        background(22, 10, 71);
+        fill(255, 0, 0);
+        textFont(f, 26);
+        text("Your kingdom has fallen!", 30, 40);
+        noStroke();
+        fill(0, 170, 0);
+        rect(0, 220, 400, 180);
+        fill(150, 150, 150);//Main tower
+        rect(120, 160, 160, 140);
+        rect(115, 150, 10, 10);
+        rect(155, 150, 10, 10);
+        rect(175, 150, 10, 10);
+        rect(195, 150, 10, 10);
+        rect(235, 150, 10, 10);
+        rect(255, 150, 10, 10);
+        //Main tower brick lines
+        stroke(0, 0, 0);
+        strokeWeight(1);
+        for(var i = 0; i < 9; i++)
+        {
+            line(120, 165+(i*10), 279, 165+(i*10));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(130, 165+(i*20), 130, 175+(i*20));
+            line(150, 165+(i*20), 150, 175+(i*20));
+            line(170, 165+(i*20), 170, 175+(i*20));
+            line(190, 165+(i*20), 190, 175+(i*20));
+            line(210, 165+(i*20), 210, 175+(i*20));
+            line(230, 165+(i*20), 230, 175+(i*20));
+            line(250, 165+(i*20), 250, 175+(i*20));
+            line(270, 165+(i*20), 270, 175+(i*20));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(140, 175+(i*20), 140, 185+(i*20));
+            line(160, 175+(i*20), 160, 185+(i*20));
+            line(180, 175+(i*20), 180, 185+(i*20));
+            line(200, 175+(i*20), 200, 185+(i*20));
+            line(220, 175+(i*20), 220, 185+(i*20));
+            line(240, 175+(i*20), 240, 185+(i*20));
+            line(260, 175+(i*20), 260, 185+(i*20));
+        }
+        noStroke();
+        fill(180, 180, 180);//Base
+        rect(40, 260, 320, 100);
+        rect(95, 250, 10, 10);
+        rect(115, 250, 10, 10);
+        rect(135, 250, 10, 10);
+        rect(155, 250, 10, 10);
+        rect(235, 250, 10, 10);
+        rect(255, 250, 10, 10);
+        rect(275, 250, 10, 10);
+        rect(295, 250, 10, 10);
+        fill(200, 200, 200);//Left tower
+        rect(40, 200, 60, 160);
+        rect(35, 190, 10, 10);
+        rect(55, 190, 10, 10);
+        rect(95, 190, 10, 10);
+        rect(5, 340, 10, 10);
+        rect(25, 360, 10, 10);
+        rect(37, 384, 10, 10);
+        rect(44, 370, 10, 10);
+        rect(64, 364, 10, 10);
+        rect(77, 380, 10, 10);
+        rect(95, 370, 10, 10);
+        rect(300, 260, 60, 100);//Right tower
+        quad(341, 240, 300, 260, 340, 260, 360, 260);
+        quad(300, 240, 300, 260, 340, 260, 360, 260);
+        rect(260, 370, 10, 10);
+        rect(278, 378, 10, 10);
+        rect(315, 367, 10, 10);
+        rect(322, 387, 10, 10);
+        rect(355, 376, 10, 10);
+        rect(374, 350, 10, 10);
+        rect(160, 240, 80, 120);//Center tower
+        rect(155, 230, 10, 10);
+        rect(195, 230, 10, 10);
+        rect(215, 230, 10, 10);
+        rect(235, 230, 10, 10);
+        //Windows
+        fill(0, 0, 0);
+        rect(130, 185, 22, 40);
+        rect(190, 185, 22, 40);
+        rect(250, 185, 22, 40);
+        ellipse(141, 185, 22, 22);
+        ellipse(201, 185, 22, 22);
+        ellipse(261, 185, 22, 22);
+        //Brick lines
+        stroke(0, 0, 0);
+        strokeWeight(1);
+        //Left tower
+        for(var i = 0; i < 16; i++)
+        {
+            line(40, 200+(i*10), 99, 200+(i*10));
+        }
+        for(i = 0; i < 8; i++)
+        {
+            line(60, 200+(i*20), 60, 210+(i*20));
+            line(80, 200+(i*20), 80, 210+(i*20));
+        }
+        for(i = 0; i < 8; i++)
+        {
+            line(50, 210+(i*20), 50, 220+(i*20));
+            line(70, 210+(i*20), 70, 220+(i*20));
+            line(90, 210+(i*20), 90, 220+(i*20));
+        }
+        //Right tower
+        for(var i = 0; i < 11; i++)
+        {
+            if(i === 0)
+            {
+                line(300, 250+(i*10), 350, 250+(i*10));
+            }
+            else
+            {
+                line(300, 250+(i*10), 359, 250+(i*10));
+            }
+        }
+        for(i = 0; i < 6; i++)
+        {
+            if(i !== 0)
+            {
+                line(320, 240+(i*20), 320, 250+(i*20));
+            }
+            line(340, 240+(i*20), 340, 250+(i*20));
+        }
+        for(i = 0; i < 6; i++)
+        {
+            line(310, 250+(i*20), 310, 260+(i*20));
+            line(330, 250+(i*20), 330, 260+(i*20));
+            line(350, 250+(i*20), 350, 260+(i*20));
+        }
+        //Center tower
+        for(var i = 0; i <12; i++)
+        {
+            line(160, 240+(i*10), 239, 240+(i*10));
+        }
+        for(i = 0; i < 3; i++)
+        {
+            line(180, 240+(i*20), 180, 250+(i*20));
+            line(200, 240+(i*20), 200, 250+(i*20));
+            line(220, 240+(i*20), 220, 250+(i*20));
+        }
+        for(i = 0; i < 6; i++)
+        {
+            line(170, 250+(i*20), 170, 260+(i*20));
+            line(190, 250+(i*20), 190, 260+(i*20));
+            line(210, 250+(i*20), 210, 260+(i*20));
+            line(230, 250+(i*20), 230, 260+(i*20));
+        }
+        //Left base
+        for(var i = 0; i < 10; i++)
+        {
+            line(100, 265+(i*10), 159, 265+(i*10));
+        }
+        for(i = 0; i < 5; i++)
+        {
+            line(110, 265+(i*20), 110, 275+(i*20));
+            line(130, 265+(i*20), 130, 275+(i*20));
+            line(150, 265+(i*20), 150, 275+(i*20));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(120, 275+(i*20), 120, 285+(i*20));
+            line(140, 275+(i*20), 140, 285+(i*20));
+        }
+        //Right base
+        for(var i = 0; i < 10; i++)
+        {
+            line(240, 265+(i*10), 299, 265+(i*10));
+        }
+        for(i = 0; i < 5; i++)
+        {
+            line(250, 265+(i*20), 250, 275+(i*20));
+            line(270, 265+(i*20), 270, 275+(i*20));
+            line(290, 265+(i*20), 290, 275+(i*20));
+        }
+        for(i = 0; i < 4; i++)
+        {
+            line(260, 275+(i*20), 260, 285+(i*20));
+            line(280, 275+(i*20), 280, 285+(i*20));
+        }
+        noStroke();
+        fill(140, 70, 20);//Gate
+        rect(180, 300, 40, 60);
+        ellipse(200, 300, 40, 40);
+        fill(0, 0, 0);//Gate
+        quad(180, 361, 185, 320, 220, 361, 220, 361);
+        quad(180, 361, 212, 330, 220, 361, 220, 361);
+        //Damage
+        fill(0, 170, 0);
+        quad(40, 280, 40, 320, 54, 290, 52, 285);
+        quad(120, 230, 120, 245, 126, 235, 127, 230);
+        fill(22, 10, 71);
+        quad(148, 140, 187, 130, 177, 235, 157, 180);
+        quad(148, 140, 187, 130, 160, 220, 157, 180);
+        stroke(0, 0, 0);
+        strokeWeight(1);
+        line(200, 280, 200, 358);//Gate "boards"
+        line(189, 283, 189, 358);
+        line(211, 283, 211, 358);
+    }
+};

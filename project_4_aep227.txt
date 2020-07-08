@@ -1,0 +1,1131 @@
+/*
+    Author: Addison Powell
+    Date: October 4, 2019
+    Comments: A single screen platformer with physics. The object of the
+    game is to collect all the gems and then jump off the top of the 
+    screen. The player will rotate around the left and right sides of the
+    screen, though the game can be completed without doing so. The player
+    is also limited to only 10 cannonballs.
+    The player has less control in the air, which is intentional, as is
+    stopping horizontal motion when the player lands.
+    
+    
+    Meta-notes:
+    -I thought about rotating through an array of 10 cannonballs so the
+    player could drop more, but I thought limiting the player to 10 added
+    a little bit of a challenge and made more sense that you weren't
+    carrying an unlimited number.
+    -The player physics aren't perfect. If A and D are held down and one
+    key is let go, the direction isn't updated (as in, if you hold D to
+    move right, then also hold A to move left, you'll keep moving to the
+    right, but then if you let go of D, you'll continue to move right
+    until you let go of all movement keys. Not 100% sure how to fix this.
+    All other multi-key inputs work fine though (can be moving left or 
+    right and jumping and dropping cannonballs).
+    -The facing of the player isn't immediately obvious. Recreating the
+    player character sprite to be more obviously facing one direction or
+    the other would fix it, but I don't have time to redraw it.
+    -I wanted to fade to the victory and defeat screens and not hard
+    cut to them when the condition is met.
+    -Ultimately, I'd like to polish this game up a lot more than I did,
+    but as always, a lack of time prevents me from doing so :(
+*/
+
+//Used in the various game states. 0 = start screen, 1 = game screen
+//2 = victory screen, 3 = defeat screen
+var screen_state = 0;
+var f = createFont("monospace");
+
+var start_box = function(x, y, r, g, b)
+{
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.g = g;
+    this.b = b;
+};
+
+start_box.prototype.display = function()
+{
+    fill(this.r, this.g, this.b);
+    noStroke();
+    rect(this.x, this.y, 250, 50);
+    fill(0, 0, 0);
+    textFont(f, 24);
+    text("START", this.x+85, this.y+32);
+};
+        
+var tilemap = [
+        "                    ",
+        "                    ",
+        "  b                 ",
+        "          c         ",
+        "        b           ",
+        "                    ",
+        "                c   ",
+        "            b       ",
+        "                    ",
+        "    c               ",
+        "  b                 ",
+        "                    ",
+        "                c   ",
+        "           b        ",
+        "                    ",
+        "  c      c          ",
+        " b                  ",
+        "                    ",
+        " p          c       ",
+        "wwwwwwwwwwwwwwwwwwww",
+        ];
+
+var GemObj = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.visible = 1;
+};
+
+var WallObj = function(x, y) {
+    this.x = x;
+    this.y = y;
+};
+
+var PCObj = function(x, y)
+{
+    this.position = new PVector(x, y);
+    this.velocity = new PVector(0, 0);
+    this.acceleration = new PVector(0, 0);
+    this.force = new PVector(0, 0);
+    this.currFrame = frameCount;
+    this.jump = 0;//Jump = 2 when jump key pressed, but no force applied yet. = 1 when force has been applied. = 0 when on ground
+    this.walkRight = 0;
+    this.walkLeft = 0;
+    this.facing = "R";
+};
+
+var EnemyObj = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.currFrameCountEnemy = 0;
+    this.facing = "L";
+    this.dead = 0;
+};
+
+var BallObj = function(x,y) {
+    this.position = new PVector(x, y);
+    this.velocity = new PVector(0, 0);
+    this.acceleration = new PVector(0, 0);
+    this.bounceCoeff = -0.3;
+    this.falling = 1;
+    this.safe = 0;
+};
+
+var PlatformObj = function(x,y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+var start_box1 = new start_box(80, 320, 0, 255, 0);
+var keyArray = [];
+var custom_images = []; //Sand = 0, collectable = 1, PC = 2, enemy = 3, cannonballs = 4
+var init_custom_graphics = function()
+{
+    //Custom sand graphic
+    background(255, 255, 255, 0);
+    noStroke();
+    fill(255, 239, 169);
+    rect(0, 0, 400, 400);
+    
+    fill(233, 199, 131);
+    rect(50, 50, 40, 40);
+    rect(130, 0, 40, 40);
+    rect(210, 30, 40, 40);
+    rect(20, 120, 40, 40);
+    rect(80, 170, 40, 40);
+    rect(220, 220, 40, 40);
+    rect(350, 50, 40, 40);
+    rect(310, 130, 40, 40);
+    rect(340, 230, 40, 40);
+    rect(40, 290, 40, 40);
+    rect(150, 260, 40, 40);
+    rect(150, 120, 40, 40);
+    rect(280, 340, 40, 40);
+    rect(100, 320, 40, 40);
+    custom_images.push(get(0,0,400,400));
+    
+    //Custom gem (collectable) graphic
+    background(255, 255, 255, 0);
+    noStroke();
+    //Gem color
+    fill(255, 0, 0);
+    rect(50, 73, 299, 161);
+    rect(27, 96, 345, 92);
+    rect(96, 234, 207, 46);
+    rect(165, 280, 69, 46);
+    ///White squares
+    fill(255, 255, 255);
+    rect(73, 73, 46, 23);
+    rect(73, 73, 46, 23);
+    rect(165, 73, 46, 23);
+    rect(257, 73, 46, 23);
+    rect(50, 119, 23, 23);
+    rect(142, 119, 23, 23);
+    rect(234, 119, 23, 23);
+    rect(326, 119, 23, 23);
+    rect(50, 165, 23, 23);
+    rect(73, 188, 23, 23);
+    rect(119, 165, 23, 23);
+    rect(119, 257, 23, 23);
+    rect(165, 280, 23, 23);
+    rect(303, 165, 23, 23);
+    rect(257, 188, 23, 23);
+    rect(234, 211, 23, 23);
+    rect(211, 234, 23, 23);
+    //Black outline
+    fill(0, 0, 0);
+    rect(73, 50, 253, 23);
+    rect(50, 73, 23, 23);
+    rect(27, 96, 23, 23);
+    rect(4, 119, 23, 69);
+    rect(326, 73, 23, 23);
+    rect(349, 96, 23, 23);
+    rect(372, 119, 23, 69);
+    rect(27, 188, 23, 23);
+    rect(349, 188, 23, 23);
+    rect(326, 211, 23, 23);
+    rect(50, 211, 23, 23);
+    rect(73, 234, 23, 23);
+    rect(303, 234, 23, 23);
+    rect(96, 257, 23, 23);
+    rect(280, 257, 23, 23);
+    rect(119, 280, 23, 23);
+    rect(257, 280, 23, 23);
+    rect(142, 303, 23, 23);
+    rect(234, 303, 23, 23);
+    rect(165, 326, 69, 23);
+    rect(4, 142, 391, 23);
+    rect(188, 142, 23, 204);
+    rect(73, 96, 23, 23);
+    rect(96, 119, 23, 23);
+    rect(119, 96, 23, 23);
+    rect(142, 73, 23, 23);
+    rect(165, 96, 23, 23);
+    rect(188, 119, 23, 23);
+    rect(211, 96, 23, 23);
+    rect(234, 73, 23, 23);
+    rect(257, 96, 23, 23);
+    rect(280, 119, 23, 23);
+    rect(303, 96, 23, 23);
+    rect(96, 165, 23, 46);
+    rect(119, 211, 23, 46);
+    rect(142, 257, 23, 46);
+    rect(280, 165, 23, 46);
+    rect(257, 211, 23, 46);
+    rect(234, 257, 23, 46);
+    custom_images.push(get(0,0,400,400));
+    
+    //Custom Player graphic facing right
+    background(255,255,255,0);
+    noStroke();
+    //Clothes
+    fill(150,150,150);
+    rect(102, 247, 136, 136);
+    rect(85, 264, 170, 34);
+    //Skin
+    fill(210,160,120);
+    rect(85, 298, 17, 17);
+    rect(238, 298, 17, 17);
+    rect(102, 145, 136, 102);
+    //Hair
+    fill(255, 255, 255);
+    rect(85, 128, 170, 17);
+    rect(102, 145, 17, 17);
+    rect(221, 145, 17, 17);
+    rect(102, 213, 17, 17);
+    rect(221, 213, 17, 17);
+    rect(119, 230, 17, 17);
+    rect(204, 230, 17, 17);
+    rect(119, 247, 102, 17);
+    rect(136, 264, 68, 17);
+    rect(153, 281, 34, 17);
+    //Black outlines
+    fill(0, 0, 0);
+    rect(102, 383, 51, 17);
+    rect(187, 383, 51, 17);
+    rect(153, 366, 34, 17);
+    rect(102, 264, 17, 136);
+    rect(221, 264, 17, 136);
+    rect(85, 315, 17, 17);
+    rect(238, 315, 17, 17);
+    rect(68, 264, 17, 51);
+    rect(255, 264, 17, 51);
+    rect(238, 247, 17, 17);
+    rect(221, 230, 17, 17);
+    rect(85, 247, 17, 17);
+    rect(102, 230, 17, 17);
+    rect(85, 145, 17, 85);
+    rect(238, 145, 17, 85);
+    rect(68, 128, 17, 34);
+    rect(255, 128, 17, 34);
+    rect(17, 94, 306, 34);
+    rect(34, 77, 272, 17);
+    rect(68, 60, 204, 17);
+    rect(85, 43, 170, 17);
+    rect(102, 26, 136, 17);
+    rect(119, 9, 102, 17);
+    //Eyes/Mouth
+    rect(136, 162, 17, 17);
+    rect(187, 162, 17, 17);
+    rect(153, 213, 34, 17);
+    //Eyepatch
+    rect(119, 145, 34, 34);
+    rect(153, 128, 17, 17);
+    rect(102, 179, 17, 17);
+    //Belt color and bar
+    fill(200, 70, 0);
+    rect(119, 315, 102, 17);
+    //Buckle color and bar
+    fill(0, 0, 0);
+    rect(153, 315, 34, 17);
+    //Skull on hat
+    fill(255, 255, 255);
+    rect(119, 26, 17, 17);
+    rect(204, 26, 17, 17);
+    rect(119, 94, 17, 17);
+    rect(204, 94, 17, 17);
+    rect(153, 94, 34, 17);
+    rect(136, 43, 68, 51);
+    fill(0, 0, 0);
+    rect(153, 60, 34, 17);
+    custom_images.push(get(0,0,400,400));
+
+    //Custom Enemy graphic facing left
+    background(255,255,255,0);
+    noStroke();
+    //White fill
+    fill(255, 255, 255);
+    rect(25, 62, 75, 275);
+    rect(100, 12, 175, 350);
+    rect(275, 62, 75, 275);
+    rect(350, 212, 25, 75);
+    //Black outline
+    fill(0, 0, 0);
+    rect(75, 12, 200, 25);
+    rect(75, 37, 25, 25);
+    rect(50, 37, 25, 50);
+    rect(25, 62, 25, 75);
+    rect(0, 112, 25, 175);
+    rect(25, 262, 25, 50);
+    rect(25, 262, 25, 75);
+    rect(50, 312, 25, 50);
+    rect(75, 337, 75, 25);
+    rect(125, 362, 150, 25);
+    rect(250, 337, 75, 25);
+    rect(300, 312, 75, 25);
+    rect(350, 287, 50, 25);
+    rect(375, 187, 25, 100);
+    rect(350, 112, 25, 100);
+    rect(325, 62, 25, 75);
+    rect(300, 37, 25, 50);
+    rect(250, 37, 50, 25);
+    //Eyes
+    rect(75, 112, 25, 50);
+    rect(125, 112, 25, 50);
+    //Mouth
+    fill(255, 0, 0);
+    rect(50, 187, 25, 75);
+    rect(100, 187, 25, 100);
+    rect(150, 187, 25, 100);
+    rect(75, 212, 25, 100);
+    rect(125, 212, 25, 100);
+    rect(175, 262, 25, 50);
+    custom_images.push(get(0,0,400,400));
+    
+    //Custom cannonball graphic
+    background(255, 255, 255, 0);
+    noStroke();
+    //Center color
+    fill(150,150,150);
+    rect(150, 100, 100, 300);
+    rect(75, 150, 75, 200);
+    rect(250, 150, 75, 200);
+    //Outline
+    fill(0, 0, 0);
+    rect(150, 375, 100, 25);
+    rect(100, 350, 50, 25);
+    rect(250, 350, 50, 25);
+    rect(75, 300, 25, 50);
+    rect(300, 300, 25, 50);
+    rect(50, 200, 25, 100);
+    rect(325, 200, 25, 100);
+    rect(75, 150, 25, 50);
+    rect(300, 150, 25, 50);
+    rect(100, 125, 50, 25);
+    rect(250, 125, 50, 25);
+    rect(150, 100, 100, 25);
+    //Reflection
+    fill(200, 200, 200);
+    rect(150, 150, 50, 25);
+    rect(125, 175, 50, 25);
+    rect(100, 200, 25, 25);
+    custom_images.push(get(0,0,400,400));
+    
+    //Custom Player graphic facing left
+    background(255,255,255,0);
+    noStroke();
+    //Clothes
+    pushMatrix();
+    translate(400,0);
+    scale(-1.0, 1.0);
+    fill(150,150,150);
+    rect(102, 247, 136, 136);
+    rect(85, 264, 170, 34);
+    //Skin
+    fill(210,160,120);
+    rect(85, 298, 17, 17);
+    rect(238, 298, 17, 17);
+    rect(102, 145, 136, 102);
+    //Hair
+    fill(255, 255, 255);
+    rect(85, 128, 170, 17);
+    rect(102, 145, 17, 17);
+    rect(221, 145, 17, 17);
+    rect(102, 213, 17, 17);
+    rect(221, 213, 17, 17);
+    rect(119, 230, 17, 17);
+    rect(204, 230, 17, 17);
+    rect(119, 247, 102, 17);
+    rect(136, 264, 68, 17);
+    rect(153, 281, 34, 17);
+    //Black outlines
+    fill(0, 0, 0);
+    rect(102, 383, 51, 17);
+    rect(187, 383, 51, 17);
+    rect(153, 366, 34, 17);
+    rect(102, 264, 17, 136);
+    rect(221, 264, 17, 136);
+    rect(85, 315, 17, 17);
+    rect(238, 315, 17, 17);
+    rect(68, 264, 17, 51);
+    rect(255, 264, 17, 51);
+    rect(238, 247, 17, 17);
+    rect(221, 230, 17, 17);
+    rect(85, 247, 17, 17);
+    rect(102, 230, 17, 17);
+    rect(85, 145, 17, 85);
+    rect(238, 145, 17, 85);
+    rect(68, 128, 17, 34);
+    rect(255, 128, 17, 34);
+    rect(17, 94, 306, 34);
+    rect(34, 77, 272, 17);
+    rect(68, 60, 204, 17);
+    rect(85, 43, 170, 17);
+    rect(102, 26, 136, 17);
+    rect(119, 9, 102, 17);
+    //Eyes/Mouth
+    rect(136, 162, 17, 17);
+    rect(187, 162, 17, 17);
+    rect(153, 213, 34, 17);
+    //Eyepatch
+    rect(119, 145, 34, 34);
+    rect(153, 128, 17, 17);
+    rect(102, 179, 17, 17);
+    //Belt color and bar
+    fill(200, 70, 0);
+    rect(119, 315, 102, 17);
+    //Buckle color and bar
+    fill(0, 0, 0);
+    rect(153, 315, 34, 17);
+    //Skull on hat
+    fill(255, 255, 255);
+    rect(119, 26, 17, 17);
+    rect(204, 26, 17, 17);
+    rect(119, 94, 17, 17);
+    rect(204, 94, 17, 17);
+    rect(153, 94, 34, 17);
+    rect(136, 43, 68, 51);
+    fill(0, 0, 0);
+    rect(153, 60, 34, 17);
+    popMatrix();
+    custom_images.push(get(0,0,400,400));
+    
+    //Custom Enemy graphic facing right
+    background(255,255,255,0);
+    noStroke();
+    //White fill
+    pushMatrix();
+    translate(400,0);
+    scale(-1.0, 1.0);
+    fill(255, 255, 255);
+    rect(25, 62, 75, 275);
+    rect(100, 12, 175, 350);
+    rect(275, 62, 75, 275);
+    rect(350, 212, 25, 75);
+    //Black outline
+    fill(0, 0, 0);
+    rect(75, 12, 200, 25);
+    rect(75, 37, 25, 25);
+    rect(50, 37, 25, 50);
+    rect(25, 62, 25, 75);
+    rect(0, 112, 25, 175);
+    rect(25, 262, 25, 50);
+    rect(25, 262, 25, 75);
+    rect(50, 312, 25, 50);
+    rect(75, 337, 75, 25);
+    rect(125, 362, 150, 25);
+    rect(250, 337, 75, 25);
+    rect(300, 312, 75, 25);
+    rect(350, 287, 50, 25);
+    rect(375, 187, 25, 100);
+    rect(350, 112, 25, 100);
+    rect(325, 62, 25, 75);
+    rect(300, 37, 25, 50);
+    rect(250, 37, 50, 25);
+    //Eyes
+    rect(75, 112, 25, 50);
+    rect(125, 112, 25, 50);
+    //Mouth
+    fill(255, 0, 0);
+    rect(50, 187, 25, 75);
+    rect(100, 187, 25, 100);
+    rect(150, 187, 25, 100);
+    rect(75, 212, 25, 100);
+    rect(125, 212, 25, 100);
+    rect(175, 262, 25, 50);
+    popMatrix();
+    custom_images.push(get(0,0,400,400));
+};
+
+//Arrays for holding entity locations from the tilemap
+var walls = [];
+var gems = [];
+var PC = [];
+var enemies = [];
+var balls = [];
+var platforms = [];
+var defeat_array = [];
+var victory_array = [];
+var collectibles = 0;
+var cannonballs_in_play = 0;
+var cannon_index = 0;
+
+//Physics variables
+var gravity = new PVector(0, 0.1);
+var walkRForce = new PVector(-1, 0);
+var walkLForce = new PVector(1, 0);
+var AirRForce = new PVector(-0.1, 0);
+var AirLForce = new PVector(0.1, 0);
+var jumpForce = new PVector(0, -4);
+
+//Sand = 0, collectable = 1, PC = 2, enemy = 3, cannonballs = 4
+
+PlatformObj.prototype.draw = function()
+{
+    noStroke();
+    fill(230, 180, 140);
+    rect(this.x+2, this.y+4, 118, 6);
+    rect(this.x+4, this.y+10, 14, 4);
+    rect(this.x+24, this.y+10, 14, 4);
+    rect(this.x+44, this.y+10, 14, 4);
+    rect(this.x+64, this.y+10, 14, 4);
+    rect(this.x+84, this.y+10, 14, 4);
+    rect(this.x+104, this.y+10, 14, 4);
+    fill(170, 130, 90);
+    rect(this.x, this.y, 120, 4);
+    rect(this.x+10, this.y+4, 2, 2);
+    rect(this.x+4, this.y+4, 2, 4);
+    rect(this.x+6, this.y+8, 2, 2);
+    rect(this.x+8, this.y+10, 6, 2);
+    rect(this.x+14, this.y+8, 2, 2);
+    rect(this.x+16, this.y+4, 2, 4);
+    rect(this.x+30, this.y+4, 2, 2);
+    rect(this.x+24, this.y+4, 2, 4);
+    rect(this.x+26, this.y+8, 2, 2);
+    rect(this.x+28, this.y+10, 6, 2);
+    rect(this.x+34, this.y+8, 2, 2);
+    rect(this.x+36, this.y+4, 2, 4);
+    rect(this.x+50, this.y+4, 2, 2);
+    rect(this.x+44, this.y+4, 2, 4);
+    rect(this.x+46, this.y+8, 2, 2);
+    rect(this.x+48, this.y+10, 6, 2);
+    rect(this.x+54, this.y+8, 2, 2);
+    rect(this.x+56, this.y+4, 2, 4);
+    rect(this.x+70, this.y+4, 2, 2);
+    rect(this.x+64, this.y+4, 2, 4);
+    rect(this.x+66, this.y+8, 2, 2);
+    rect(this.x+68, this.y+10, 6, 2);
+    rect(this.x+74, this.y+8, 2, 2);
+    rect(this.x+76, this.y+4, 2, 4);
+    rect(this.x+90, this.y+4, 2, 2);
+    rect(this.x+84, this.y+4, 2, 4);
+    rect(this.x+86, this.y+8, 2, 2);
+    rect(this.x+88, this.y+10, 6, 2);
+    rect(this.x+94, this.y+8, 2, 2);
+    rect(this.x+96, this.y+4, 2, 4);
+    rect(this.x+110, this.y+4, 2, 2);
+    rect(this.x+104, this.y+4, 2, 4);
+    rect(this.x+106, this.y+8, 2, 2);
+    rect(this.x+108, this.y+10, 6, 2);
+    rect(this.x+114, this.y+8, 2, 2);
+    rect(this.x+116, this.y+4, 2, 4);
+    rect(this.x, this.y, 2, 10);
+    rect(this.x+2, this.y+10, 2, 2);
+    rect(this.x+4, this.y+12, 2, 2);
+    rect(this.x+6, this.y+14, 10, 2);
+    rect(this.x+16, this.y+12, 2, 2);
+    rect(this.x+18, this.y+10, 2, 2);
+    rect(this.x+20, this.y, 2, 10);
+    rect(this.x, this.y, 2, 10);
+    rect(this.x+22, this.y+10, 2, 2);
+    rect(this.x+24, this.y+12, 2, 2);
+    rect(this.x+26, this.y+14, 10, 2);
+    rect(this.x+36, this.y+12, 2, 2);
+    rect(this.x+38, this.y+10, 2, 2);
+    rect(this.x+40, this.y, 2, 10);
+    rect(this.x, this.y, 2, 10);
+    rect(this.x+42, this.y+10, 2, 2);
+    rect(this.x+44, this.y+12, 2, 2);
+    rect(this.x+46, this.y+14, 10, 2);
+    rect(this.x+56, this.y+12, 2, 2);
+    rect(this.x+58, this.y+10, 2, 2);
+    rect(this.x+60, this.y, 2, 10);
+    rect(this.x+62, this.y+10, 2, 2);
+    rect(this.x+64, this.y+12, 2, 2);
+    rect(this.x+66, this.y+14, 10, 2);
+    rect(this.x+76, this.y+12, 2, 2);
+    rect(this.x+78, this.y+10, 2, 2);
+    rect(this.x+80, this.y, 2, 10);
+    rect(this.x+82, this.y+10, 2, 2);
+    rect(this.x+84, this.y+12, 2, 2);
+    rect(this.x+86, this.y+14, 10, 2);
+    rect(this.x+96, this.y+12, 2, 2);
+    rect(this.x+98, this.y+10, 2, 2);
+    rect(this.x+100, this.y, 2, 10);
+    rect(this.x+100, this.y, 2, 10);
+    rect(this.x+102, this.y+10, 2, 2);
+    rect(this.x+104, this.y+12, 2, 2);
+    rect(this.x+106, this.y+14, 10, 2);
+    rect(this.x+116, this.y+12, 2, 2);
+    rect(this.x+118, this.y+10, 2, 2);
+    rect(this.x+120, this.y, 2, 10);
+};
+WallObj.prototype.draw = function()
+{
+    image(custom_images[0], this.x, this.y, 20, 20);
+};
+
+GemObj.prototype.draw = function()
+{
+    image(custom_images[1], this.x, this.y, 20, 20);
+};
+
+BallObj.prototype.draw = function()
+{
+    image(custom_images[4], this.position.x, this.position.y, 20, 20);
+};
+
+EnemyObj.prototype.draw = function()
+{
+    if(this.facing === "L")
+    {
+        image(custom_images[3], this.x, this.y, 20, 20);
+    }
+    else if (this.facing === "R")
+    {
+        image(custom_images[6], this.x, this.y, 20, 20);
+    }
+};
+
+EnemyObj.prototype.draw_end = function()
+{
+    if(this.facing === "L")
+    {
+        image(custom_images[3], this.x, this.y, 40, 40);
+    }
+    else if (this.facing === "R")
+    {
+        image(custom_images[6], this.x, this.y, 40, 40);
+    }
+};
+
+GemObj.prototype.draw_end = function()
+{
+    image(custom_images[1], this.x, this.y, 40, 40);
+};
+
+PCObj.prototype.draw = function()
+{
+    if(this.facing === "R")
+    {
+        image(custom_images[2], this.position.x, this.position.y, 20, 20);
+    }
+    else if(this.facing === "L")
+    {
+        image(custom_images[5], this.x, this.y, 20, 20);
+    }
+};
+
+//Physics and position updates for the player character
+PCObj.prototype.update = function()
+{
+    this.acceleration.set(0, 0);
+    if (this.walkRight === 1)
+    {
+        if(this.jump > 0)
+        {
+            this.applyForce(AirRForce);
+        }
+        else
+        {
+            this.applyForce(walkRForce);
+        }
+    }
+    if (this.walkLeft === 1)
+    {
+        if(this.jump > 0)
+        {
+            this.applyForce(AirLForce);
+        }
+        else
+        {
+            this.applyForce(walkLForce);
+        }
+    }
+    if (this.jump === 2)
+    {
+        this.applyForce(jumpForce);
+        this.jump = 1;
+    }
+    if (this.jump > 0)
+    {
+        this.applyForce(gravity);
+    }
+    this.velocity.add(this.acceleration);
+    this.position.add(this.velocity);
+    this.acceleration.set(0, 0);
+
+    if (this.position.x > 410)
+    {
+        this.position.x = -10;
+    }
+    else if (this.position.x < -10)
+    {
+        this.position.x = 410;
+    }
+    if (this.position.y >= 359.99)
+    {
+        this.position.y = 360;
+        this.velocity.y = 0;
+        this.jump = 0;
+    }
+    for(var i = 0; i < platforms.length; i++)//Checks for landing on platforms
+    {
+        if(this.velocity.y >= 0 && this.position.y+20 >= platforms[i].y && this.position.y+20 <= platforms[i].y+20 && this.position.x+12 >= platforms[i].x && this.position.x <= platforms[i].x+112)
+        {
+            this.position.y = platforms[i].y-20;
+            this.velocity.y = 0;
+            this.jump = 0;
+        }
+    }
+    for(var i = 0; i < platforms.length; i++)//Checks for falling off platforms
+    {
+        if(this.position.y+20 === platforms[i].y && (this.position.x+12 <= platforms[i].x || this.position.x >= platforms[i].x+112))
+        {
+            this.jump = 1;
+        }
+    }
+    if(this.velocity.x !== 0 && this.walkRight === 0 && this.walkLeft === 0 && this.jump === 0)//Stops the player after letting go of a movement key. Maintains x velocity in the air
+    {
+        this.velocity.set(0,0);
+    }
+};
+
+PCObj.prototype.draw = function()
+{
+    image(custom_images[2], this.position.x, this.position.y, 20, 20);
+};
+
+//Physics for the cannonballs. Doesn't check collisions with platforms
+BallObj.prototype.update = function()
+{
+    this.acceleration.set(0, 0);
+    if(this.falling === 1)
+    {
+        this.applyForce(gravity);
+    }
+    this.velocity.add(this.acceleration);
+    this.position.add(this.velocity);
+    this.acceleration.set(0, 0);
+    if (this.position.y >= 359.99)
+    {
+        this.position.y = 360;
+        this.velocity.y *= this.bounceCoeff;
+        this.safe = 1;
+    }
+};
+
+PCObj.prototype.applyForce = function(force)
+{
+    this.acceleration.add(force);
+    //Limits the top speed of the player
+    if(this.velocity.x >= 2)
+    {
+        this.velocity.set(2, this.velocity.y);
+    }
+    if(this.velocity.x <= -2)
+    {
+        this.velocity.set(-2, this.velocity.y);
+    }
+    
+};
+
+BallObj.prototype.applyForce = function(force)
+{
+    this.acceleration.add(force);
+};
+
+var keyPressed = function()
+{
+    keyArray[keyCode] = 1;
+};
+
+var keyReleased = function()
+{
+    keyArray[keyCode] = 0;
+};
+
+//Loads the entity locations from the tilemap
+var initTilemap = function()
+{
+    for (var i = 0; i< tilemap.length; i++)
+    {
+        for (var j = 0; j < tilemap[i].length; j++)
+        {
+            switch (tilemap[i][j])
+            {
+                case 'w': walls.push(new WallObj(j*20, i*20));
+                    break;
+                case 'c': gems.push(new GemObj(j*20, i*20));
+                        collectibles = collectibles + 1;
+                    break;
+                case 'p': PC.push(new PCObj(j*20, i*20));
+                    break;
+                case 'b': platforms.push(new PlatformObj(j*20, i*20));
+                    break;
+            }
+        }
+    }
+};
+
+/*
+    Randomly generates 7 ghosts in designated sectors of the game screen
+    Sector 1 x between 0-100; Sector 1 y between 0-100
+    Sector 2 x between 130-230; Sector 2 y between 0-100
+    Sector 3 x between 260-380; Sector 3 y between 0-100
+    Sector 4 x between 200-240; Sector 4 y between 130-230
+    Sector 5 x between 260-380; Sector 5 y between 130-230
+    Sector 6 x between 200-240; Sector 6 y between 260-360
+    Sector 7 x between 260-380; Sector 7 y between 260-360
+*/
+var init_enemies = function()
+{
+    enemies.push(new EnemyObj(random(0,100),random(0,100)));//Sector 1
+    enemies.push(new EnemyObj(random(130,230),random(0,100)));//Sector 2
+    enemies.push(new EnemyObj(random(260,380),random(0,100)));//Sector 3
+    enemies.push(new EnemyObj(random(200,240),random(130,230)));//Sector 4
+    enemies.push(new EnemyObj(random(260,380),random(130,230)));//Sector 5
+    enemies.push(new EnemyObj(random(200,240),random(260,360)));//Sector 6
+    enemies.push(new EnemyObj(random(260,380),random(260,360)));//Sector 7
+};
+
+var init_end_arrays = function()//Used in the win and loss screens
+{
+    victory_array.push(new GemObj(80, 80));
+    victory_array.push(new GemObj(290, 80));
+    victory_array.push(new GemObj(80, 290));
+    victory_array.push(new GemObj(290, 290));
+    defeat_array.push(new EnemyObj(80, 80));
+    defeat_array.push(new EnemyObj(290, 80));
+    defeat_array.push(new EnemyObj(80, 290));
+    defeat_array.push(new EnemyObj(290, 290));
+};
+
+GemObj.prototype.move = function()
+{
+    if(this.y === 100 && this.x < 200) //moving along top edge
+    {
+        this.x = this.x + 1;
+    }
+    if(this.x === 200 && this.y < 200) //moving along right edge
+    {
+        this.y = this.y + 1;
+    }
+    if(this.y === 200 && this.x > 100) //moving along bottom edge
+    {
+        this.x = this.x - 1;
+    }
+    if(this.x === 100 && this.y > 100) //moving along left edge
+    {
+        this.y = this.y - 1;
+    }
+};
+
+EnemyObj.prototype.move_ghost = function()
+{
+    if(this.x < 185)
+    {
+        this.facing = "R";
+    }
+    else
+    {
+        this.facing = "L";
+    }
+    
+    if(this.y === 80 && this.x < 290) //moving along top edge
+    {
+        this.x += 1;
+    }
+    if(this.x === 290 && this.y < 290) //moving along right edge
+    {
+        this.y += 1;
+    }
+    if(this.y === 290 && this.x > 80) //moving along bottom edge
+    {
+        this.x -= 1;
+    }
+    if(this.x === 80 && this.y > 80) //moving along left edge
+    {
+        this.y -= 1;
+    }
+};
+
+GemObj.prototype.move_gem = function()
+{
+    if(this.y === 80 && this.x < 290) //moving along top edge
+    {
+        this.x += 1;
+    }
+    if(this.x === 290 && this.y < 290) //moving along right edge
+    {
+        this.y += 1;
+    }
+    if(this.y === 290 && this.x > 80) //moving along bottom edge
+    {
+        this.x -= 1;
+    }
+    if(this.x === 80 && this.y > 80) //moving along left edge
+    {
+        this.y -= 1;
+    }
+};
+
+initTilemap();
+init_custom_graphics();
+init_enemies();
+init_end_arrays();
+
+draw = function()
+{
+    if(screen_state === 0)//Draws the "start screen" until the button is clicked
+    {
+        background(0, 0, 0);
+        textFont(f, 24);
+        fill(0, 255, 0);
+        text("Pirate Island", 100, 40);
+        textFont(f, 16);
+        text("Collect all the treasure and reach\nthe top of the screen to win.\nAvoid the ghosts! They can move\nthrough platforms!\nDrop cannonballs on the ghosts to\ndefeat them! You have 10 cannonballs\nto start!", 20 ,64); 
+        text("Controls:\nw = jump        s = drop cannonball\na = move left   d = move right", 20 ,200);
+        start_box1.display();
+        if(mouseIsPressed)
+        {
+            if(mouseX > start_box1.x && mouseX < start_box1.x+250 &&
+                mouseY > start_box1.y && mouseY < start_box1.y+50)
+            {
+                screen_state = 1;
+            }
+        }
+    }
+    else if(screen_state === 1)//Main game screen
+    {
+        //Check for any player movement inputs
+        if(keyArray[87] === 1)//w is pressed
+        {
+            if(PC[0].jump === 0)
+            {
+                PC[0].jump = 2;
+            }
+        }
+        if(keyArray[83] === 1)//s is pressed
+        {
+            if(PC[0].currFrame < frameCount - 10)
+            {
+                PC[0].currFrame = frameCount;
+                var ball_x = 0;
+                var ball_y = 0;
+                if(PC[0].facing === "R")
+                {
+                    ball_x = PC[0].position.x+15;
+                    ball_y = PC[0].position.y-20;    
+                }
+                else
+                {
+                    ball_x = PC[0].position.x-20;
+                    ball_y = PC[0].position.y-20;
+                }
+                if(cannonballs_in_play < 10)
+                {
+                    balls.push(new BallObj(ball_x, ball_y));
+                    cannonballs_in_play += 1;
+                }
+            }
+        }
+        
+        if(keyArray[65] === 1)//a is pressed
+        {
+            PC[0].facing = "L";
+            PC[0].walkRight = 1;
+        }
+        else if(keyArray[68] === 1)//d is pressed
+        {
+            PC[0].facing = "R";
+            PC[0].walkLeft = 1;
+        }
+        else
+        {
+            PC[0].walkRight = 0;
+            PC[0].walkLeft = 0;
+        }
+        
+        //Draws any visible ie not collected chips, updates the number of collectibles left for victory purposes
+        for (var i=0; i<gems.length; i++)
+        {
+            if(PC[0].position.x < gems[i].x+12 && PC[0].position.x > gems[i].x-12 &&
+               PC[0].position.y < gems[i].y+12 && PC[0].position.y > gems[i].y-12 &&
+               gems[i].visible === 1)
+            {
+                gems[i].visible = 0;
+                collectibles = collectibles - 1;
+            }
+        }
+        
+        //Enemy movement
+        for(var i=0; i<enemies.length; i++)
+        {
+            var dir = "";
+            var x_dist = 0;
+            var y_dist = 0;
+            x_dist = enemies[i].x - PC[0].position.x;
+            y_dist = enemies[i].y - PC[0].position.y;
+            if (abs(x_dist) < 100 && abs(y_dist) < 100 && enemies[i].currFrameCountEnemy < (frameCount - 4))
+            {
+                enemies[i].currFrameCountEnemy = frameCount;
+                if(x_dist < 0)//if negative, needs to move right
+                {
+                    enemies[i].x += 1;
+                    enemies[i].facing = "R";
+                }
+                else if(x_dist > 0)//if positive, needs to move left
+                {
+                    enemies[i].x -= 1;
+                    enemies[i].facing = "L";
+                }
+                
+                if(y_dist > 0)//postive = move up
+                {
+                    enemies[i].y -= 1;
+                }
+                else if(y_dist < 0)//negative = move down
+                {
+                    enemies[i].y += 1;
+                }
+            }
+            for(var j = 0; j < balls.length; j++)
+            {
+                if(balls[j].position.x < enemies[i].x+12 && balls[j].position.x > enemies[i].x-12 && balls[j].position.y < enemies[i].y+12 && balls[j].position.y > enemies[i].y-12 && balls[j].safe === 0)
+                {
+                    enemies[i].dead = 1;
+                }
+            }
+            
+        }
+        background(0, 220, 255);
+        //Draws the sand ground, any collectibles that haven't been picked up yet, the player character, enemies, and cannonballs
+        for (var i=0; i<walls.length; i++)
+        {
+            walls[i].draw();
+        }
+        for (i=0; i<gems.length; i++)
+        {
+            if(gems[i].visible === 1)
+            {
+                gems[i].draw();
+            }
+        }
+        for (var i=0; i<platforms.length; i++)
+        {
+            platforms[i].draw();
+        }
+        PC[0].update();
+        PC[0].draw();
+        fill(0, 0, 0);
+        text("Cannonballs: ", 0, 397);
+        text((10-cannonballs_in_play), 170, 397);
+        for (i=0; i<enemies.length; i++)
+        {
+            if(enemies[i].dead === 0)
+            {
+                enemies[i].draw();
+            }
+        }
+        if(cannonballs_in_play !== 0)
+        {
+            for (i=0; i<balls.length; i++)
+            {
+                balls[i].update();
+                balls[i].draw();
+            }   
+        }
+        
+        if(collectibles === 0 && PC[0].position.y < -20)//Win condition
+        {
+            screen_state = 2;
+        }
+        
+        if(screen_state !== 2)//Checks if a ghost has hit the player
+        {
+            for(var i = 0; i<enemies.length; i++)
+            {
+                
+                if(PC[0].position.x < enemies[i].x+12 && PC[0].position.x > enemies[i].x-12 && PC[0].position.y < enemies[i].y+12 && PC[0].position.y > enemies[i].y-12 && enemies[i].dead === 0)
+                {
+                    screen_state = 3;
+                }
+            }
+        }
+    }    
+    if(screen_state === 2)//Victory screen
+    {
+        background(255, 255, 255);
+        image(custom_images[2], 150, 150, 100, 100);
+        for(var i = 0; i < 4; i++)
+        {
+            victory_array[i].move_gem();
+            victory_array[i].draw_end();
+        }
+        fill(0, 0, 0);
+        text("You win!", 140, 40);
+    }
+       
+    if(screen_state === 3)//Defeat screen
+    {
+        background(0, 0, 0);
+        image(custom_images[2], 150, 150, 100, 100);
+        for(var i = 0; i < 4; i++)
+        {
+            defeat_array[i].move_ghost();
+            defeat_array[i].draw_end();
+        }
+        fill(255, 255, 255);
+        text("You lose!", 140, 40);
+    }
+};
