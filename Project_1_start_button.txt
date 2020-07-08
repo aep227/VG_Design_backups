@@ -1,0 +1,77 @@
+//Test file for designing animated start button
+var f = createFont("monospace");
+
+var start_box = function(x, y, r, g, b)
+{
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.g = g;
+    this.b = b;
+};
+
+var start_star = function(x,y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+start_box.prototype.display = function()
+{
+    fill(this.r, this.g, this.b);
+    noStroke();
+    rect(this.x, this.y, 150, 150);
+    fill(255, 255, 255);
+    textFont(f, 24);
+    text("START", this.x+40, this.y+80);
+};
+
+start_star.prototype.display = function()
+{
+    fill(255, 0, 0);
+    noStroke();
+    //triangle(this.x-10, this.y+10, this.x+10, this.y+10, this.x, this.y-10);
+    image(getImage("cute/Star"), this.x-30, this.y-45, 60, 80);
+};
+
+start_star.prototype.move = function(start_box)
+{
+    if(this.y === start_box.y && this.x < start_box.x+150) //moving along top edge
+    {
+        this.x = this.x + 1;
+    }
+    if(this.x === start_box.x+150 && this.y < start_box.y+150) //moving along right edge
+    {
+        this.y = this.y + 1;
+    }
+    if(this.y === start_box.y+150 && this.x > start_box.x) //moving along bottom edge
+    {
+        this.x = this.x - 1;
+    }
+    if(this.x === start_box.x && this.y > start_box.y) //moving along left edge
+    {
+        this.y = this.y - 1;
+    }
+    
+    
+    
+};
+
+var start_box1 = new start_box(100, 140, 0, 0, 0);
+var start_star_arr = [];
+start_star_arr.push(new start_star(start_box1.x, start_box1.y)); // top left corner
+start_star_arr.push(new start_star(start_box1.x+150, start_box1.y)); // top right corner
+start_star_arr.push(new start_star(start_box1.x+150, start_box1.y+150)); // bottom left corner
+start_star_arr.push(new start_star(start_box1.x, start_box1.y+150)); // bottom right corner
+
+draw = function()
+{
+    background(255, 255, 255);
+    start_box1.display();
+    for(var i = 0; i < 4; i++)
+    {
+        start_star_arr[i].move(start_box1);
+        start_star_arr[i].display();
+    }
+    
+};

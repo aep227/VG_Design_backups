@@ -1,0 +1,265 @@
+/*
+    Author: Addison Powell
+    Date:
+    Comments: Final project for ECE 4525: Video Game Design and Engineering.
+              A simple top-down shooter set in the Warhammer 40,000 universe.
+
+
+	Development to do list:
+		Checkpoint 1:
+		-Make buttons transparent
+		-Find background image
+*/
+
+var screen_state = 0; //Start screen, options screen, instructions, victory, defeat
+var f = createFont("Copperplate Gothic");
+
+var tilemap = [
+    "                    ",
+    "                    ",
+    "  b                 ",
+    "          c         ",
+    "        b           ",
+    "                    ",
+    "                c   ",
+    "            b       ",
+    "                    ",
+    "    c               ",
+    "  b                 ",
+    "                    ",
+    "                c   ",
+    "           b        ",
+    "                    ",
+    "  c      c          ",
+    " b                  ",
+    "                    ",
+    " p          c       ",
+    "wwwwwwwwwwwwwwwwwwww",
+];
+
+
+var ButtonObj = function(x, y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+var WallObj = function (x, y)
+{
+    this.x = x;
+    this.y = y;
+};
+
+var PCObj = function (x, y)
+{
+    this.x = x;
+    this.y = y;
+    this.angle = 0;
+    this.currFrame = frameCount;
+};
+
+var EnemyObj = function (x, y, type, health)
+{
+    this.x = x;
+    this.y = y;
+    this.angle = 0;
+    this.type = type;//"Boy"/"Shoota"/"Nob"
+    this.health = health;
+};
+
+var BulletObj = function (x, y, type, damage)
+{
+    this.x = x;
+    this.y = y;
+    this.type = type;//"Bolt"/"Plasma"/etc
+    this.damage = damage;
+};
+
+var keyArray = [];
+var custom_images = [];
+
+var init_custom_graphics = function ()
+{
+    //Custom sand graphic
+    background(255, 255, 255, 0);
+    noStroke();
+    custom_images.push(get(0, 0, 400, 400));
+};
+
+//Arrays for holding entity locations from the tilemap
+var walls = [];
+var enemies = [];
+
+//Other game variables
+var PC;
+var mouse_click = false;
+var start_button = new ButtonObj(100, 200);
+var options_button = new ButtonObj(100, 270);
+var instructions_button = new ButtonObj(100, 340);
+var difficulty_button = new ButtonObj(100, 150);
+
+var diff = "Astartes";//Astra Militarum = Easy; Astartes = Medium; Primarch = Hard
+
+PCObj.prototype.draw = function ()
+{
+    //To start, black/gold circle with a line to indicate angle
+    stroke(170, 170, 170);
+    fill(0, 0, 0);
+    //Will make more detailed later
+};
+
+EnemyObj.prototype.draw = function ()
+{
+};
+
+ButtonObj.prototype.draw = function ()
+{
+    fill(255, 0, 0);
+    noStroke();
+    rect(this.x, this.y, 250, 50);
+};
+
+
+var keyPressed = function ()
+{
+    keyArray[keyCode] = 1;
+};
+
+var keyReleased = function ()
+{
+    keyArray[keyCode] = 0;
+};
+
+//Loads the entity locations from the tilemap
+var initTilemap = function ()
+{
+    for (var i = 0; i < tilemap.length; i++) {
+        for (var j = 0; j < tilemap[i].length; j++) {
+            switch (tilemap[i][j]) {
+                case 'w': walls.push(new WallObj(j * 20, i * 20));
+                    break;
+                case 'p': PC = new PCObj(j * 20, i * 20);
+                    break;
+            }
+        }
+    }
+};
+
+initTilemap();
+init_custom_graphics();
+
+draw = function ()
+{
+    if (screen_state === 0)//Main menu
+    {
+        background(0, 0, 0);
+        fill(255,0,255);
+        noStroke();
+        textFont(f, 32);
+        text("Title", 150, 50);
+        start_button.draw();
+        options_button.draw();
+        instructions_button.draw();
+        textFont(f, 24);
+        fill(255, 255, 255);
+        text("Start", start_button.x+10, start_button.y+30);
+        text("Options", options_button.x+10, options_button.y+30);
+        text("Instructions", instructions_button.x+10, instructions_button.y+30);
+        if(mouseX > 100 && mouseX < 350)
+        {
+            if(mouseY > start_button.y && mouseY < start_button.y+50)
+            {
+                mouseClicked = function()
+                {
+                    screen_state = 3;
+                };
+                fill(255, 255, 255);
+                noStroke();
+                ellipse(start_button.x-40, start_button.y+25, 30, 30);
+            }
+            if(mouseY > options_button.y && mouseY < options_button.y+50)
+            {
+                mouseClicked = function()
+                {
+                    screen_state = 1;
+                };
+                fill(255, 255, 255);
+                noStroke();
+                ellipse(options_button.x-40, options_button.y+25, 30, 30);
+            }
+            if(mouseY > instructions_button.y && mouseY < instructions_button.y+50)
+            {
+                mouseClicked = function()
+                {
+                    screen_state = 2;
+                };
+                fill(255, 255, 255);
+                noStroke();
+                ellipse(instructions_button.x-40, instructions_button.y+25, 30, 30);
+            }
+        }
+    }
+    if (screen_state === 1)//Options
+    {
+        background(0, 0, 0);
+        instructions_button.draw();
+        difficulty_button.draw();
+        textFont(f, 24);
+        fill(255, 255, 255);
+        text("Difficulty", difficulty_button.x+30, difficulty_button.y-20);
+        text(diff, difficulty_button.x+40, difficulty_button.y+30);
+        text("Main Menu", instructions_button.x+10, instructions_button.y+30);
+        if(mouseY > difficulty_button.y && mouseY < difficulty_button.y+50)
+        {
+            mouseClicked = function()
+            {
+                if(diff === "Astra Militarum")
+                {
+                    diff = "Astartes";
+                }
+                else if(diff === "Astartes")
+                {
+                    diff = "Primarch";
+                }
+                else if(diff === "Primarch")
+                {
+                    diff = "Astra Militarum";
+                }
+            };
+            fill(255, 255, 255);
+            noStroke();
+            ellipse(difficulty_button.x-40, difficulty_button.y+25, 30, 30);
+        }
+        if(mouseY > instructions_button.y && mouseY < instructions_button.y+50)
+        {
+            mouseClicked = function()
+            {
+                screen_state = 0;
+            };
+            fill(255, 255, 255);
+            noStroke();
+            ellipse(instructions_button.x-40, instructions_button.y+25, 30, 30);
+        }
+    }
+    if (screen_state === 2)//Instructions/Story
+    {
+        background(0, 0, 0);
+        instructions_button.draw();
+        textFont(f, 24);
+        fill(255, 255, 255);
+        text("Main Menu", instructions_button.x+10, instructions_button.y+30);
+        if(mouseY > instructions_button.y && mouseY < instructions_button.y+50)
+        {
+            mouseClicked = function()
+            {
+                screen_state = 0;
+            };
+            fill(255, 255, 255);
+            noStroke();
+            ellipse(instructions_button.x-40, instructions_button.y+25, 30, 30);
+        }
+    }
+    if (screen_state === 3)//Game
+    {
+    }
+};
